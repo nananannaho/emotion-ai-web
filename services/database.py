@@ -9,14 +9,14 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from pathlib import Path
 
 import numpy as np
 
-from config import DATA_DIR, FACES_DIR, USERS_DIR
+from config import DATA_DIR, LEGACY_FACES_DIR, LEGACY_USERS_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,9 @@ _USE_POSTGRES = DATABASE_URL.startswith(("postgres://", "postgresql://"))
 
 
 def _safe_username(username: str) -> str:
-    return "".join(c for c in username if c.isalnum() or c in "_-")
+    raw = (username or "").strip()
+    safe = re.sub(r"[^\w\-]", "", raw, flags=re.UNICODE).strip()
+    return (safe or raw)[:64]
 
 
 def _embedding_to_bytes(embedding: np.ndarray) -> bytes:
@@ -41,20 +43,13 @@ def _bytes_to_embedding(data: bytes) -> np.ndarray:
 class Database:
     def __init__(self):
         self._postgres = None
+        self._pg_url = None
+        self._pg_extras = None
         if _USE_POSTGRES:
-            try:
-                import psycopg2
-                import psycopg2.extras
-
-                url = DATABASE_URL
-                if url.startswith("postgres://"):
-                    url = url.replace("postgres://", "postgresql://", 1)
-                self._postgres = psycopg2.connect(url)
-                self._pg_extras = psycopg2.extras
-                logger.info("PostgreSQL 데이터베이스 연결됨 (데이터 영구 저장)")
-            except Exception as exc:
-                logger.error("PostgreSQL 연결 실패, SQLite 사용: %s", exc)
-                self._postgres = None
+            self._pg_url = DATABASE_URL
+            if self._pg_url.startswith("postgres://"):
+                self._pg_url = self._pg_url.replace("postgres://", "postgresql://", 1)
+            self._connect_postgres()
 
         if not self._postgres:
             DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -63,14 +58,67 @@ class Database:
         self.init_schema()
         self.migrate_legacy_json()
 
+    def _connect_postgres(self):
+        try:
+            import psycopg2
+            import psycopg2.extras
+
+            self._postgres = psycopg2.connect(self._pg_url)
+            self._postgres.autocommit = False
+            self._pg_extras = psycopg2.extras
+            logger.info("PostgreSQL 연결됨")
+        except Exception as exc:
+            logger.error("PostgreSQL 연결 실패, SQLite 사용: %s", exc)
+            self._postgres = None
+
+    def _pg_ensure_alive(self):
+        if not self._postgres:
+            return
+        try:
+            with self._postgres.cursor() as cur:
+                cur.execute("SELECT 1")
+        except Exception:
+            logger.warning("PostgreSQL 재연결 시도")
+            try:
+                self._postgres.close()
+            except Exception:
+                pass
+            self._postgres = None
+            self._connect_postgres()
+
+    def _pg_cursor(self):
+        self._pg_ensure_alive()
+        if not self._postgres:
+            raise RuntimeError("PostgreSQL 사용 불가")
+        return self._postgres.cursor()
+
+    def _pg_commit(self):
+        if self._postgres:
+            self._postgres.commit()
+
+    def _pg_rollback(self):
+        if self._postgres:
+            try:
+                self._postgres.rollback()
+            except Exception:
+                pass
+
+    def _pg_run(self, sql: str, params=None):
+        try:
+            with self._pg_cursor() as cur:
+                cur.execute(sql, params)
+            self._pg_commit()
+        except Exception:
+            self._pg_rollback()
+            raise
+
     @property
     def backend(self) -> str:
         return "postgresql" if self._postgres else "sqlite"
 
     def init_schema(self):
         if self._postgres:
-            cur = self._postgres.cursor()
-            cur.execute(
+            self._pg_run(
                 """
                 CREATE TABLE IF NOT EXISTS users (
                     username VARCHAR(64) PRIMARY KEY,
@@ -83,7 +131,7 @@ class Database:
                 )
                 """
             )
-            cur.execute(
+            self._pg_run(
                 """
                 CREATE TABLE IF NOT EXISTS face_embeddings (
                     username VARCHAR(64) PRIMARY KEY REFERENCES users(username) ON DELETE CASCADE,
@@ -91,27 +139,27 @@ class Database:
                 )
                 """
             )
-            self._postgres.commit()
-        else:
-            with self._sqlite() as conn:
-                conn.executescript(
-                    """
-                    CREATE TABLE IF NOT EXISTS users (
-                        username TEXT PRIMARY KEY,
-                        display_name TEXT NOT NULL,
-                        password_hash TEXT NOT NULL,
-                        preferences TEXT NOT NULL DEFAULT '{}',
-                        mood_history TEXT NOT NULL DEFAULT '[]',
-                        chat_history TEXT NOT NULL DEFAULT '[]',
-                        created_at TEXT NOT NULL
-                    );
-                    CREATE TABLE IF NOT EXISTS face_embeddings (
-                        username TEXT PRIMARY KEY,
-                        embedding BLOB NOT NULL,
-                        FOREIGN KEY (username) REFERENCES users(username) ON DELETE CASCADE
-                    );
-                    """
-                )
+            return
+
+        with self._sqlite() as conn:
+            conn.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS users (
+                    username TEXT PRIMARY KEY,
+                    display_name TEXT NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    preferences TEXT NOT NULL DEFAULT '{}',
+                    mood_history TEXT NOT NULL DEFAULT '[]',
+                    chat_history TEXT NOT NULL DEFAULT '[]',
+                    created_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS face_embeddings (
+                    username TEXT PRIMARY KEY,
+                    embedding BLOB NOT NULL,
+                    FOREIGN KEY (username) REFERENCES users(username) ON DELETE CASCADE
+                );
+                """
+            )
 
     @contextmanager
     def _sqlite(self):
@@ -128,9 +176,9 @@ class Database:
 
     def migrate_legacy_json(self):
         """예전 JSON/npy 파일 → DB 이전 (한 번만)."""
-        if not USERS_DIR.exists():
+        if not LEGACY_USERS_DIR.exists():
             return
-        for path in USERS_DIR.glob("*.json"):
+        for path in LEGACY_USERS_DIR.glob("*.json"):
             try:
                 profile = json.loads(path.read_text(encoding="utf-8"))
                 username = profile.get("username") or path.stem
@@ -144,7 +192,7 @@ class Database:
                     mood_history=profile.get("mood_history", []),
                     chat_history=profile.get("chat_history", []),
                 )
-                npy = FACES_DIR / f"{_safe_username(username)}.npy"
+                npy = LEGACY_FACES_DIR / f"{_safe_username(username)}.npy"
                 if npy.exists():
                     emb = np.load(npy)
                     self.save_embedding(username, emb)
@@ -154,10 +202,17 @@ class Database:
 
     def user_exists(self, username: str) -> bool:
         u = _safe_username(username)
+        if not u:
+            return False
         if self._postgres:
-            cur = self._postgres.cursor()
-            cur.execute("SELECT 1 FROM users WHERE username = %s", (u,))
-            return cur.fetchone() is not None
+            try:
+                with self._pg_cursor() as cur:
+                    cur.execute("SELECT 1 FROM users WHERE username = %s", (u,))
+                    return cur.fetchone() is not None
+            except Exception as exc:
+                logger.error("user_exists 오류: %s", exc)
+                self._pg_rollback()
+                raise
         with self._sqlite() as conn:
             row = conn.execute("SELECT 1 FROM users WHERE username = ?", (u,)).fetchone()
             return row is not None
@@ -172,14 +227,15 @@ class Database:
         chat_history: list,
     ):
         u = _safe_username(username)
+        if not u:
+            raise ValueError("유효하지 않은 사용자 이름입니다.")
         now = datetime.now(timezone.utc).isoformat()
         prefs = json.dumps(preferences, ensure_ascii=False)
         moods = json.dumps(mood_history, ensure_ascii=False)
         chats = json.dumps(chat_history, ensure_ascii=False)
 
         if self._postgres:
-            cur = self._postgres.cursor()
-            cur.execute(
+            self._pg_run(
                 """
                 INSERT INTO users (username, display_name, password_hash, preferences, mood_history, chat_history, created_at)
                 VALUES (%s, %s, %s, %s, %s, %s, NOW())
@@ -187,7 +243,6 @@ class Database:
                 """,
                 (u, display_name, password_hash, prefs, moods, chats),
             )
-            self._postgres.commit()
         else:
             with self._sqlite() as conn:
                 conn.execute(
@@ -208,6 +263,36 @@ class Database:
         embedding: np.ndarray,
     ):
         u = _safe_username(username)
+        if not u:
+            raise ValueError("유효하지 않은 사용자 이름입니다.")
+
+        if self._postgres:
+            import psycopg2
+
+            prefs = json.dumps(preferences, ensure_ascii=False)
+            blob = psycopg2.Binary(_embedding_to_bytes(embedding))
+            try:
+                with self._pg_cursor() as cur:
+                    cur.execute(
+                        """
+                        INSERT INTO users (username, display_name, password_hash, preferences, mood_history, chat_history, created_at)
+                        VALUES (%s, %s, %s, %s, '[]', '[]', NOW())
+                        """,
+                        (u, display_name, password_hash, prefs),
+                    )
+                    cur.execute(
+                        """
+                        INSERT INTO face_embeddings (username, embedding)
+                        VALUES (%s, %s)
+                        """,
+                        (u, blob),
+                    )
+                self._pg_commit()
+            except Exception:
+                self._pg_rollback()
+                raise
+            return
+
         self._insert_user(
             username=u,
             display_name=display_name,
@@ -220,18 +305,21 @@ class Database:
 
     def save_embedding(self, username: str, embedding: np.ndarray):
         u = _safe_username(username)
+        if not u:
+            raise ValueError("유효하지 않은 사용자 이름입니다.")
         blob = _embedding_to_bytes(embedding)
         if self._postgres:
-            cur = self._postgres.cursor()
-            cur.execute(
+            import psycopg2
+
+            pg_blob = psycopg2.Binary(blob)
+            self._pg_run(
                 """
                 INSERT INTO face_embeddings (username, embedding)
                 VALUES (%s, %s)
                 ON CONFLICT (username) DO UPDATE SET embedding = EXCLUDED.embedding
                 """,
-                (u, blob),
+                (u, pg_blob),
             )
-            self._postgres.commit()
         else:
             with self._sqlite() as conn:
                 conn.execute(
@@ -244,13 +332,19 @@ class Database:
 
     def get_user_full(self, username: str) -> dict | None:
         u = _safe_username(username)
+        if not u:
+            return None
         if self._postgres:
-            cur = self._postgres.cursor(cursor_factory=self._pg_extras.RealDictCursor)
-            cur.execute("SELECT * FROM users WHERE username = %s", (u,))
-            row = cur.fetchone()
-            if not row:
-                return None
-            return dict(row)
+            try:
+                self._pg_ensure_alive()
+                with self._postgres.cursor(cursor_factory=self._pg_extras.RealDictCursor) as cur:
+                    cur.execute("SELECT * FROM users WHERE username = %s", (u,))
+                    row = cur.fetchone()
+                    return dict(row) if row else None
+            except Exception as exc:
+                logger.error("get_user_full 오류: %s", exc)
+                self._pg_rollback()
+                raise
         with self._sqlite() as conn:
             row = conn.execute("SELECT * FROM users WHERE username = ?", (u,)).fetchone()
             if not row:
@@ -260,15 +354,21 @@ class Database:
     def get_all_embeddings(self) -> dict[str, np.ndarray]:
         result = {}
         if self._postgres:
-            cur = self._postgres.cursor()
-            cur.execute("SELECT username, embedding FROM face_embeddings")
-            for username, blob in cur.fetchall():
-                result[username] = _bytes_to_embedding(bytes(blob))
-        else:
-            with self._sqlite() as conn:
-                rows = conn.execute("SELECT username, embedding FROM face_embeddings").fetchall()
-                for row in rows:
-                    result[row["username"]] = _bytes_to_embedding(row["embedding"])
+            try:
+                with self._pg_cursor() as cur:
+                    cur.execute("SELECT username, embedding FROM face_embeddings")
+                    for username, blob in cur.fetchall():
+                        result[username] = _bytes_to_embedding(bytes(blob))
+            except Exception as exc:
+                logger.error("get_all_embeddings 오류: %s", exc)
+                self._pg_rollback()
+                raise
+            return result
+
+        with self._sqlite() as conn:
+            rows = conn.execute("SELECT username, embedding FROM face_embeddings").fetchall()
+            for row in rows:
+                result[row["username"]] = _bytes_to_embedding(row["embedding"])
         return result
 
     def update_mood_history(self, username: str, emotion: str, limit: int = 20):
@@ -291,16 +391,16 @@ class Database:
 
     def _update_json_field(self, username: str, field: str, value: list):
         u = _safe_username(username)
+        if not u:
+            return
         data = json.dumps(value, ensure_ascii=False)
         if field not in ("mood_history", "chat_history"):
             return
         if self._postgres:
-            cur = self._postgres.cursor()
-            cur.execute(
+            self._pg_run(
                 f"UPDATE users SET {field} = %s WHERE username = %s",
                 (data, u),
             )
-            self._postgres.commit()
         else:
             with self._sqlite() as conn:
                 conn.execute(f"UPDATE users SET {field} = ? WHERE username = ?", (data, u))

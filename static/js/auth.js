@@ -1,11 +1,6 @@
 const AuthHelper = (() => {
   let capturedFace = null;
 
-  const EMOTION_KO = {
-    angry: "분노", disgust: "혐오", fear: "불안", happy: "기쁨",
-    sad: "슬픔", surprise: "놀람", neutral: "평온",
-  };
-
   function showError(elId, msg) {
     const el = document.getElementById(elId);
     if (!el) return;
@@ -13,28 +8,21 @@ const AuthHelper = (() => {
     el.textContent = msg || "";
   }
 
-  async function postJson(url, body) {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    return res.json();
-  }
-
   function initRegister() {
     const captureBtn = document.getElementById("captureFaceBtn");
     const form = document.getElementById("registerForm");
     const status = document.getElementById("faceStatus");
 
-    captureBtn?.addEventListener("click", () => {
+    captureBtn?.addEventListener("click", async () => {
       CameraHelper.clearGalleryCapture?.();
-      capturedFace = CameraHelper.captureDataUrl();
+      status.textContent = "사진 처리 중...";
+      capturedFace = await CameraHelper.captureDataUrl();
       if (capturedFace) {
         status.textContent = "얼굴 촬영 완료! 가입을 진행하세요.";
         status.style.color = "#55efc4";
       } else {
-        status.textContent = "촬영에 실패했습니다. 카메라를 확인해 주세요.";
+        status.textContent = "촬영에 실패했습니다. '사진 촬영/선택'을 이용해 주세요.";
+        status.style.color = "#ff7675";
       }
     });
 
@@ -42,15 +30,18 @@ const AuthHelper = (() => {
       e.preventDefault();
       showError("registerError", "");
 
-      const faceImage = CameraHelper.captureDataUrl() || capturedFace;
+      status.textContent = "사진 준비 중...";
+      let faceImage = (await CameraHelper.captureDataUrl()) || capturedFace;
       if (!faceImage) {
-        showError("registerError", "얼굴을 촬영하거나 사진을 선택해 주세요.");
+        showError("registerError", "얼굴을 촬영하거나 '사진 촬영/선택'을 이용해 주세요.");
+        status.textContent = "";
         return;
       }
 
       const fd = new FormData(form);
       const btn = form.querySelector('button[type="submit"]');
       btn.disabled = true;
+      status.textContent = "서버에 가입 요청 중... (최대 1분)";
 
       try {
         const data = await postJson("/api/register", {
@@ -64,9 +55,11 @@ const AuthHelper = (() => {
           window.location.href = "/dashboard";
         } else {
           showError("registerError", data.error || "가입에 실패했습니다.");
+          status.textContent = "";
         }
-      } catch {
-        showError("registerError", "서버 연결에 실패했습니다.");
+      } catch (err) {
+        showError("registerError", err.message || "서버 연결에 실패했습니다.");
+        status.textContent = "";
       } finally {
         btn.disabled = false;
       }
@@ -85,26 +78,28 @@ const AuthHelper = (() => {
 
     document.getElementById("faceLoginBtn")?.addEventListener("click", async () => {
       const status = document.getElementById("loginFaceStatus");
-      const img = CameraHelper.captureDataUrl();
+      showError("loginError", "");
+      status.textContent = "얼굴 인식 중...";
+
+      const img = await CameraHelper.captureDataUrl();
       if (!img) {
-        showError("loginError", "카메라에서 이미지를 가져올 수 없습니다.");
+        showError("loginError", "사진을 가져올 수 없습니다. '사진 촬영/선택'을 이용해 주세요.");
+        status.textContent = "";
         return;
       }
-
-      status.textContent = "얼굴 인식 중...";
-      showError("loginError", "");
 
       try {
         const data = await postJson("/api/login/face", { face_image: img });
         if (data.success) {
-          status.textContent = `인식 성공 (일치도 ${(data.match_score * 100).toFixed(0)}%)`;
+          status.textContent = `인식 성공 (${(data.match_score * 100).toFixed(0)}%)`;
           window.location.href = "/dashboard";
         } else {
           showError("loginError", data.error || "로그인 실패");
           status.textContent = "";
         }
-      } catch {
-        showError("loginError", "서버 연결에 실패했습니다.");
+      } catch (err) {
+        showError("loginError", err.message || "서버 연결에 실패했습니다.");
+        status.textContent = "";
       }
     });
 
@@ -123,8 +118,8 @@ const AuthHelper = (() => {
         } else {
           showError("loginError", data.error || "로그인 실패");
         }
-      } catch {
-        showError("loginError", "서버 연결에 실패했습니다.");
+      } catch (err) {
+        showError("loginError", err.message || "서버 연결에 실패했습니다.");
       }
     });
   }

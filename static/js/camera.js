@@ -1,11 +1,14 @@
 /**
- * 웹캠 / 모바일 갤러리 · 셀카 촬영
+ * 웹캠 / 모바일 갤러리 · 업로드용 이미지 압축
  */
 const CameraHelper = (() => {
   let stream = null;
   let videoEl = null;
   let canvasEl = null;
   let lastDataUrl = null;
+
+  const MAX_UPLOAD_WIDTH = 640;
+  const JPEG_QUALITY = 0.72;
 
   const isMobile = () =>
     /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
@@ -15,8 +18,8 @@ const CameraHelper = (() => {
     if (isMobile()) {
       return {
         facingMode: "user",
-        width: { ideal: 1280, max: 1920 },
-        height: { ideal: 720, max: 1080 },
+        width: { ideal: 640, max: 1280 },
+        height: { ideal: 480, max: 720 },
       };
     }
     return {
@@ -26,6 +29,39 @@ const CameraHelper = (() => {
     };
   }
 
+  function compressDataUrl(dataUrl, maxWidth = MAX_UPLOAD_WIDTH, quality = JPEG_QUALITY) {
+    return new Promise((resolve) => {
+      if (!dataUrl) {
+        resolve(null);
+        return;
+      }
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width;
+        let h = img.height;
+        if (w > maxWidth) {
+          h = Math.round((h * maxWidth) / w);
+          w = maxWidth;
+        }
+        const c = document.createElement("canvas");
+        c.width = w;
+        c.height = h;
+        const ctx = c.getContext("2d");
+        ctx.translate(w, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(c.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    });
+  }
+
+  async function prepareForUpload(dataUrl) {
+    if (!dataUrl) return null;
+    return compressDataUrl(dataUrl);
+  }
+
   async function init(videoId, canvasId) {
     videoEl = document.getElementById(videoId);
     canvasEl = document.getElementById(canvasId);
@@ -33,7 +69,7 @@ const CameraHelper = (() => {
 
     if (!navigator.mediaDevices?.getUserMedia) {
       showCameraHint(
-        "이 브라우저는 카메라를 지원하지 않습니다. 아래 '사진 선택'을 이용해 주세요."
+        "이 브라우저는 카메라를 지원하지 않습니다. '사진 촬영/선택'을 이용해 주세요."
       );
       return false;
     }
@@ -53,10 +89,9 @@ const CameraHelper = (() => {
       return true;
     } catch (err) {
       console.error("카메라 접근 실패:", err);
-      const msg = isMobile()
-        ? "카메라를 쓸 수 없습니다. '사진 촬영/선택' 버튼을 이용해 주세요. (iPhone은 Safari에서 같은 Wi-Fi 주소 접속 시 카메라가 제한될 수 있어요)"
-        : "카메라 권한을 허용해 주세요.";
-      showCameraHint(msg);
+      showCameraHint(
+        "카메라를 쓸 수 없습니다. '사진 촬영/선택' 버튼으로 등록해 주세요."
+      );
       return false;
     }
   }
@@ -71,51 +106,54 @@ const CameraHelper = (() => {
     }
   }
 
-  function captureDataUrl() {
-    if (lastDataUrl) return lastDataUrl;
+  async function captureDataUrl() {
+    if (lastDataUrl) return prepareForUpload(lastDataUrl);
     if (!videoEl || !canvasEl) return null;
     const w = videoEl.videoWidth || 640;
     const h = videoEl.videoHeight || 480;
     if (!w || !h) return null;
 
-    canvasEl.width = w;
-    canvasEl.height = h;
+    const scale = w > MAX_UPLOAD_WIDTH ? MAX_UPLOAD_WIDTH / w : 1;
+    const cw = Math.round(w * scale);
+    const ch = Math.round(h * scale);
+
+    canvasEl.width = cw;
+    canvasEl.height = ch;
     const ctx = canvasEl.getContext("2d");
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.translate(w, 0);
+    ctx.translate(cw, 0);
     ctx.scale(-1, 1);
-    ctx.drawImage(videoEl, 0, 0, w, h);
-    return canvasEl.toDataURL("image/jpeg", 0.82);
+    ctx.drawImage(videoEl, 0, 0, cw, ch);
+    return prepareForUpload(canvasEl.toDataURL("image/jpeg", JPEG_QUALITY));
   }
 
-  function setFromFile(file, previewVideoId) {
-    return new Promise((resolve, reject) => {
-      if (!file || !file.type.startsWith("image/")) {
-        reject(new Error("이미지 파일만 선택할 수 있습니다."));
-        return;
-      }
+  async function setFromFile(file, previewVideoId) {
+    if (!file || !file.type.startsWith("image/")) {
+      throw new Error("이미지 파일만 선택할 수 있습니다.");
+    }
+    const raw = await new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => {
-        lastDataUrl = reader.result;
-        const preview = document.getElementById(previewVideoId);
-        if (preview && preview.tagName === "VIDEO") {
-          const wrap = preview.parentElement;
-          let img = wrap.querySelector(".preview-img");
-          if (!img) {
-            img = document.createElement("img");
-            img.className = "preview-img";
-            img.alt = "선택한 사진";
-            wrap.appendChild(img);
-          }
-          img.src = lastDataUrl;
-          img.style.display = "block";
-          preview.style.display = "none";
-        }
-        resolve(lastDataUrl);
-      };
+      reader.onload = () => resolve(reader.result);
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(file);
     });
+    lastDataUrl = await compressDataUrl(raw);
+
+    const preview = document.getElementById(previewVideoId);
+    if (preview && preview.tagName === "VIDEO") {
+      const wrap = preview.parentElement;
+      let img = wrap.querySelector(".preview-img");
+      if (!img) {
+        img = document.createElement("img");
+        img.className = "preview-img";
+        img.alt = "선택한 사진";
+        wrap.appendChild(img);
+      }
+      img.src = lastDataUrl;
+      img.style.display = "block";
+      preview.style.display = "none";
+    }
+    return lastDataUrl;
   }
 
   function clearGalleryCapture() {
@@ -136,7 +174,7 @@ const CameraHelper = (() => {
         await setFromFile(file, previewVideoId);
         const status = statusId ? document.getElementById(statusId) : null;
         if (status) {
-          status.textContent = "사진이 준비되었습니다.";
+          status.textContent = "사진 준비 완료. 가입을 진행하세요.";
           status.style.color = "#55efc4";
         }
       } catch (e) {
@@ -152,6 +190,7 @@ const CameraHelper = (() => {
     setFromFile,
     clearGalleryCapture,
     bindGalleryButton,
+    prepareForUpload,
     isMobile,
   };
 })();

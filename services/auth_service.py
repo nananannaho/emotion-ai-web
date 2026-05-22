@@ -43,13 +43,25 @@ class AuthService:
             "topics": ["일상", "학교", "취미"],
         }
 
-        self.db.create_user(
-            username=username,
-            display_name=display_name or username,
-            password_hash=generate_password_hash(password),
-            preferences=prefs,
-            embedding=embedding,
-        )
+        try:
+            self.db.create_user(
+                username=username,
+                display_name=display_name or username,
+                password_hash=generate_password_hash(password),
+                preferences=prefs,
+                embedding=embedding,
+            )
+        except Exception as exc:
+            logger.exception("create_user 실패 (%s): %s", username, exc)
+            msg = str(exc).lower()
+            if "duplicate" in msg or "unique" in msg or "already exists" in msg:
+                return {"success": False, "error": "이미 존재하는 사용자입니다."}
+            if "foreign key" in msg:
+                return {"success": False, "error": "가입 저장에 실패했습니다. 다시 시도해 주세요."}
+            return {
+                "success": False,
+                "error": "가입 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+            }
         return {"success": True, "username": username}
 
     def login_password(self, username: str, password: str) -> dict:
@@ -58,7 +70,7 @@ class AuthService:
             return {"success": False, "error": "사용자를 찾을 수 없습니다."}
         if not check_password_hash(profile["password_hash"], password):
             return {"success": False, "error": "비밀번호가 올바르지 않습니다."}
-        return {"success": True, "profile": self._public_profile(profile)}
+        return {"success": True, "profile": self.public_profile(profile)}
 
     def login_face(self, face_image_bgr) -> dict:
         embeddings = self.db.get_all_embeddings()
@@ -76,7 +88,7 @@ class AuthService:
         profile = self.db.get_user_full(user)
         return {
             "success": True,
-            "profile": self._public_profile(profile),
+            "profile": self.public_profile(profile),
             "match_score": round(score, 3),
         }
 
@@ -93,16 +105,13 @@ class AuthService:
         profile = self.db.get_user_full(username)
         if not profile:
             return None
-        return self._public_profile(profile)
-
-    def update_mood_history(self, username: str, emotion: str, limit: int = 20):
-        self.db.update_mood_history(username, emotion, limit)
+        return self.public_profile(profile)
 
     def append_chat(self, username: str, role: str, content: str, limit: int = 50):
         self.db.append_chat(username, role, content, limit)
 
     @staticmethod
-    def _public_profile(profile: dict) -> dict:
+    def public_profile(profile: dict) -> dict:
         prefs = profile.get("preferences", {})
         moods = profile.get("mood_history", [])
         if isinstance(prefs, str):

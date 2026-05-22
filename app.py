@@ -83,22 +83,44 @@ def dashboard():
 
 @app.post("/api/register")
 def api_register():
-    data = request.get_json(silent=True) or {}
-    image = emotion_service.decode_image(data.get("face_image", ""))
-    if image is None:
-        return jsonify({"success": False, "error": "얼굴 이미지가 필요합니다."}), 400
+    try:
+        data = request.get_json(silent=True) or {}
+    except Exception:
+        return jsonify({"success": False, "error": "요청 데이터가 너무 큽니다. 사진을 다시 선택해 주세요."}), 413
 
-    result = auth_service.register(
-        username=(data.get("username") or "").strip(),
-        password=data.get("password") or "",
-        display_name=(data.get("display_name") or "").strip(),
-        preferences=data.get("preferences"),
-        face_image_bgr=image,
-    )
-    if result.get("success"):
-        session["user"] = result["username"]
-    status = 200 if result.get("success") else 400
-    return jsonify(result), status
+    try:
+        image = emotion_service.decode_image(data.get("face_image", ""))
+        if image is None:
+            return jsonify({"success": False, "error": "얼굴 이미지가 필요합니다."}), 400
+
+        result = auth_service.register(
+            username=(data.get("username") or "").strip(),
+            password=data.get("password") or "",
+            display_name=(data.get("display_name") or "").strip(),
+            preferences=data.get("preferences"),
+            face_image_bgr=image,
+        )
+        if result.get("success"):
+            session["user"] = result["username"]
+        status = 200 if result.get("success") else 400
+        return jsonify(result), status
+    except Exception as exc:
+        logger.exception("회원가입 처리 오류: %s", exc)
+        return jsonify({
+            "success": False,
+            "error": "가입 처리 중 서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+        }), 500
+
+
+@app.errorhandler(500)
+def handle_500(err):
+    if request.path.startswith("/api/"):
+        logger.exception("API 500: %s", err)
+        return jsonify({
+            "success": False,
+            "error": "서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+        }), 500
+    return err
 
 
 @app.post("/api/login/password")
@@ -110,7 +132,6 @@ def api_login_password():
     )
     if result.get("success"):
         session["user"] = result["profile"]["username"]
-        session["profile"] = result["profile"]
     status = 200 if result.get("success") else 401
     return jsonify(result), status
 
@@ -125,7 +146,6 @@ def api_login_face():
     result = auth_service.login_face(image)
     if result.get("success"):
         session["user"] = result["profile"]["username"]
-        session["profile"] = result["profile"]
     status = 200 if result.get("success") else 401
     return jsonify(result), status
 
