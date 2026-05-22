@@ -55,9 +55,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-  window.EMOTION_USER = {{ user|tojson }};
-</script>
+<script src="{{ url_for('static', filename='js/api.js') }}"></script>
 <script src="{{ url_for('static', filename='js/camera.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 {% endblock %}

@@ -1,5 +1,5 @@
 /** API 요청 (모바일·Render 슬립 대응) */
-async function postJson(url, body, timeoutMs = 90000) {
+window.postJson = async function postJson(url, body, timeoutMs = 90000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -40,4 +40,4 @@ async function postJson(url, body, timeoutMs = 90000) {
   } finally {
     clearTimeout(timer);
   }
-}
+};
