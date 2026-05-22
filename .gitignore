@@ -4,6 +4,8 @@ __pycache__/
 .env
 data/users/*.json
 data/faces/*.npy
+data/emotionai.db
+data/emotionai.db-journal
 weights/*.keras
 .DS_Store
 *.log

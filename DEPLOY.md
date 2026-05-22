@@ -78,9 +78,21 @@ git push -u origin main
 - Render 무료는 **슬립 모드** → 첫 접속 시 30초~1분 걸릴 수 있음  
 - 과제 제출 URL은 미리 한 번 열어 두기
 
-### 회원가입이 사라져요
-- 무료 서버는 재배포·재시작 시 `data/` 폴더가 비워질 수 있음  
-- 데모용 계정은 배포 후 다시 만들기
+### 회원가입이 사라져요 (Render 무료)
+Render 무료는 서버 디스크가 임시라 **SQLite만으로는 재배포 시 데이터가 사라질 수 있습니다.**
+
+**영구 저장 (권장):** 무료 PostgreSQL 연결
+
+👉 **자세한 단계:** [NEON-데이터베이스.md](NEON-데이터베이스.md) 를 열어 따라 하세요.
+
+요약:
+1. https://neon.tech 가입 → **New Project**
+2. **Connection string** 복사 (`postgresql://...` 한 줄 전체)
+3. Render → emotion-ai → **Environment** → `DATABASE_URL` = 붙여넣기 → **Save**
+4. `/health` 에 `"database": "postgresql"` 확인
+5. 사이트에서 **다시 회원가입** 후 로그인 테스트
+
+로컬 PC(`run.bat`)는 `data/emotionai.db`에 **자동 영구 저장**됩니다.
 
 ### 코드 수정 후 반영
 ```powershell

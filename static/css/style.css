@@ -290,6 +290,27 @@ body {
   margin-right: auto;
 }
 
+.info-box {
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  background: rgba(108, 92, 231, 0.12);
+  border: 1px solid rgba(108, 92, 231, 0.25);
+  border-radius: 10px;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.info-box strong {
+  color: var(--primary-light);
+}
+
+.hero-info {
+  max-width: 480px;
+  margin: 0 auto 1rem;
+  text-align: center;
+}
+
 /* Features */
 .features {
   display: grid;

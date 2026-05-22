@@ -11,7 +11,8 @@ import sys
 from flask import Flask, jsonify, render_template, request, session
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from config import IS_CLOUD, SECRET_KEY, USE_LIGHT_ML
+from config import DATABASE_URL, IS_CLOUD, SECRET_KEY, USE_LIGHT_ML
+from services.database import get_db
 from services.auth_service import AuthService
 from services.chatbot_service import ChatbotService
 from services.emotion_service import EmotionService
@@ -32,6 +33,7 @@ if IS_CLOUD:
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
+get_db()
 auth_service = AuthService()
 emotion_service = EmotionService()
 chatbot_service = ChatbotService()
@@ -47,7 +49,14 @@ def inject_globals():
 
 @app.get("/health")
 def health():
-    return jsonify({"status": "ok", "cloud": IS_CLOUD, "light_ml": USE_LIGHT_ML})
+    db = get_db()
+    return jsonify({
+        "status": "ok",
+        "cloud": IS_CLOUD,
+        "light_ml": USE_LIGHT_ML,
+        "database": db.backend,
+        "database_url_set": bool(DATABASE_URL),
+    })
 
 
 @app.route("/")
@@ -128,7 +137,8 @@ def api_analyze_emotion():
     if image is None:
         return jsonify({"success": False, "error": "이미지를 처리할 수 없습니다."}), 400
 
-    username = session.get("user") or data.get("username")
+    # 로그인한 본인 계정에만 감정·대화 이력 저장 (다른 사용자 데이터와 분리)
+    username = session.get("user")
     result = emotion_service.analyze_frame(
         image, username=username, message=data.get("message", "")
     )

@@ -17,6 +17,8 @@ MAX_CONTENT_LENGTH = 8 * 1024 * 1024
 # 클라우드 배포: TensorFlow 없이 OpenCV·휴리스틱 ML 사용 (무료 서버 메모리 절약)
 USE_LIGHT_ML = os.environ.get("USE_LIGHT_ML", "").lower() in ("1", "true", "yes")
 IS_CLOUD = bool(os.environ.get("RENDER") or os.environ.get("RAILWAY_ENVIRONMENT"))
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+DB_PATH = DATA_DIR / "emotionai.db"
 
 EMOTION_LABELS = ["angry", "disgust", "fear", "happy", "sad", "surprise", "neutral"]
 EMOTION_LABELS_KO = {
