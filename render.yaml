@@ -6,8 +6,9 @@ services:
     name: emotion-ai
     runtime: python
     plan: free
-    buildCommand: pip install -r requirements-deploy.txt
+    buildCommand: pip install --upgrade pip && pip install -r requirements-deploy.txt
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 120 --workers 1
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9

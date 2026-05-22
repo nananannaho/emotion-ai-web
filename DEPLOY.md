@@ -70,8 +70,40 @@ git push -u origin main
 
 ## 자주 묻는 문제
 
-### 배포가 실패해요
-- Render 로그에서 `pip install` 오류 확인
+### 배포가 Failed로 떠요
+
+Render 대시보드 → 서비스 → **Logs** → 실패한 배포 클릭 → **Build** / **Deploy** 탭을 구분해 확인합니다.
+
+| 로그 위치 | 흔한 원인 | 해결 |
+|-----------|-----------|------|
+| **Build** | `requirements.txt`로 설치 (TensorFlow) | **Settings → Build Command** 를 아래로 통일 |
+| **Build** | `pip` 타임아웃·메모리 | `requirements-deploy.txt` 만 사용 (TensorFlow 없음) |
+| **Deploy** | 앱 시작 직후 종료 | Logs **Deploy** 에 `ImportError` / `PostgreSQL` 확인 |
+| **Deploy** | Neon URL 오류 | Environment에 `DATABASE_URL` 전체 붙여넣기 (`postgresql://...`) |
+
+**Build Command (복사해서 붙여넣기):**
+
+```
+pip install --upgrade pip && pip install -r requirements-deploy.txt
+```
+
+**Start Command:**
+
+```
+gunicorn app:app --bind 0.0.0.0:$PORT --timeout 120 --workers 1
+```
+
+**Environment Variables (필수):**
+
+| Key | Value |
+|-----|--------|
+| `USE_LIGHT_ML` | `1` |
+| `RENDER` | `true` |
+| `DATABASE_URL` | Neon 연결 문자열 (선택, 영구 저장용) |
+
+설정 저장 후 **Manual Deploy → Deploy latest commit** 다시 실행.
+
+### 배포가 실패해요 (기타)
 - Python 3.11 사용 (`runtime.txt` 참고)
 
 ### 15분 안 쓰면 느려져요 (무료 플랜)
@@ -81,26 +113,47 @@ git push -u origin main
 ### 회원가입이 사라져요 (Render 무료)
 Render 무료는 서버 디스크가 임시라 **SQLite만으로는 재배포 시 데이터가 사라질 수 있습니다.**
 
-**영구 저장 (권장):** 무료 PostgreSQL 연결
+**영구 저장 (권장):** Neon PostgreSQL
 
-👉 **자세한 단계:** [NEON-데이터베이스.md](NEON-데이터베이스.md) 를 열어 따라 하세요.
-
-요약:
 1. https://neon.tech 가입 → **New Project**
-2. **Connection string** 복사 (`postgresql://...` 한 줄 전체)
-3. Render → emotion-ai → **Environment** → `DATABASE_URL` = 붙여넣기 → **Save**
-4. `/health` 에 `"database": "postgresql"` 확인
-5. 사이트에서 **다시 회원가입** 후 로그인 테스트
+2. **Connection string** 전체 복사 (`postgresql://...`)
+3. Render → 서비스 → **Environment** → `DATABASE_URL` 붙여넣기 → **Save**
+4. 재배포 후 `/health` → `"database": "postgresql"` 확인
+5. 사이트에서 **새로 회원가입** 후 재로그인 테스트
 
-로컬 PC(`run.bat`)는 `data/emotionai.db`에 **자동 영구 저장**됩니다.
+> DB 주소·비밀번호는 **GitHub에 올리지 마세요.** Render Environment에만 넣습니다.
+
+로컬 PC(`run.bat`)는 `data/emotionai.db`에 자동 저장됩니다.
+
+### Git 없이 GitHub에 올리기
+
+1. GitHub → **New repository**
+2. **Add file** → **Upload files**
+3. 프로젝트 파일 드래그 (`venv` 폴더 제외)
+4. **Commit changes** → Render Blueprint 연결
 
 ### 코드 수정 후 반영
+
+**`배포-업데이트.bat`** 실행 또는:
+
 ```powershell
 git add .
 git commit -m "수정 내용"
 git push
 ```
+
 Render가 자동으로 다시 배포합니다.
+
+**자동 배포가 안 될 때:** Render 대시보드 → 해당 서비스 → **Manual Deploy** → **Deploy latest commit**
+
+배포 반영 확인: `/health` 응답에 `"api_version": 2` 가 보이면 최신 코드입니다.
+
+### 모바일에서 "서버 연결에 실패했습니다"
+
+1. 브라우저에서 `https://본인주소.onrender.com/health` 를 먼저 열어 서버를 깨웁니다 (30~60초 대기).
+2. `/health` 에 `"api_version": 2` 가 없으면 Render에서 **Manual Deploy** 를 실행하세요.
+3. 회원가입 시 **「사진 촬영 / 선택」** 버튼으로 정면 얼굴 사진을 올립니다 (카메라 미리보기만으로는 실패할 수 있음).
+4. Wi-Fi가 불안정하면 1분 정도 기다린 뒤 다시 시도합니다.
 
 ## 수동 배포 (Blueprint 없이)
 

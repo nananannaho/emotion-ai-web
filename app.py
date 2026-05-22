@@ -33,10 +33,15 @@ if IS_CLOUD:
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-get_db()
-auth_service = AuthService()
-emotion_service = EmotionService()
-chatbot_service = ChatbotService()
+try:
+    get_db()
+    auth_service = AuthService()
+    emotion_service = EmotionService()
+    chatbot_service = ChatbotService()
+    logger.info("EmotionAI 서비스 초기화 완료 (light_ml=%s)", USE_LIGHT_ML)
+except Exception:
+    logger.exception("서비스 초기화 실패 — 배포 설정을 확인하세요")
+    raise
 
 
 @app.context_processor
@@ -121,7 +126,7 @@ def handle_500(err):
             "success": False,
             "error": "서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
         }), 500
-    return err
+    return "서버 오류가 발생했습니다.", 500
 
 
 @app.post("/api/login/password")

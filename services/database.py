@@ -26,6 +26,14 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 _USE_POSTGRES = DATABASE_URL.startswith(("postgres://", "postgresql://"))
 
 
+def _normalize_pg_url(url: str) -> str:
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
+    if "sslmode=" not in url:
+        url += "&sslmode=require" if "?" in url else "?sslmode=require"
+    return url
+
+
 def _safe_username(username: str) -> str:
     raw = (username or "").strip()
     safe = re.sub(r"[^\w\-]", "", raw, flags=re.UNICODE).strip()
@@ -46,30 +54,43 @@ class Database:
         self._pg_url = None
         self._pg_extras = None
         if _USE_POSTGRES:
-            self._pg_url = DATABASE_URL
-            if self._pg_url.startswith("postgres://"):
-                self._pg_url = self._pg_url.replace("postgres://", "postgresql://", 1)
+            self._pg_url = _normalize_pg_url(DATABASE_URL)
             self._connect_postgres()
 
         if not self._postgres:
             DB_PATH.parent.mkdir(parents=True, exist_ok=True)
             logger.info("SQLite 데이터베이스: %s", DB_PATH)
 
-        self.init_schema()
-        self.migrate_legacy_json()
+        try:
+            self.init_schema()
+            self.migrate_legacy_json()
+        except Exception as exc:
+            logger.error("DB 초기화 실패: %s", exc)
+            self._disconnect_postgres()
+            DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+            self.init_schema()
+            self.migrate_legacy_json()
+
+    def _disconnect_postgres(self):
+        if self._postgres:
+            try:
+                self._postgres.close()
+            except Exception:
+                pass
+        self._postgres = None
 
     def _connect_postgres(self):
         try:
             import psycopg2
             import psycopg2.extras
 
-            self._postgres = psycopg2.connect(self._pg_url)
+            self._postgres = psycopg2.connect(self._pg_url, connect_timeout=10)
             self._postgres.autocommit = False
             self._pg_extras = psycopg2.extras
             logger.info("PostgreSQL 연결됨")
         except Exception as exc:
             logger.error("PostgreSQL 연결 실패, SQLite 사용: %s", exc)
-            self._postgres = None
+            self._disconnect_postgres()
 
     def _pg_ensure_alive(self):
         if not self._postgres:
@@ -118,28 +139,32 @@ class Database:
 
     def init_schema(self):
         if self._postgres:
-            self._pg_run(
-                """
-                CREATE TABLE IF NOT EXISTS users (
-                    username VARCHAR(64) PRIMARY KEY,
-                    display_name VARCHAR(128) NOT NULL,
-                    password_hash TEXT NOT NULL,
-                    preferences TEXT NOT NULL DEFAULT '{}',
-                    mood_history TEXT NOT NULL DEFAULT '[]',
-                    chat_history TEXT NOT NULL DEFAULT '[]',
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            try:
+                self._pg_run(
+                    """
+                    CREATE TABLE IF NOT EXISTS users (
+                        username VARCHAR(64) PRIMARY KEY,
+                        display_name VARCHAR(128) NOT NULL,
+                        password_hash TEXT NOT NULL,
+                        preferences TEXT NOT NULL DEFAULT '{}',
+                        mood_history TEXT NOT NULL DEFAULT '[]',
+                        chat_history TEXT NOT NULL DEFAULT '[]',
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                    """
                 )
-                """
-            )
-            self._pg_run(
-                """
-                CREATE TABLE IF NOT EXISTS face_embeddings (
-                    username VARCHAR(64) PRIMARY KEY REFERENCES users(username) ON DELETE CASCADE,
-                    embedding BYTEA NOT NULL
+                self._pg_run(
+                    """
+                    CREATE TABLE IF NOT EXISTS face_embeddings (
+                        username VARCHAR(64) PRIMARY KEY REFERENCES users(username) ON DELETE CASCADE,
+                        embedding BYTEA NOT NULL
+                    )
+                    """
                 )
-                """
-            )
-            return
+                return
+            except Exception as exc:
+                logger.error("PostgreSQL 스키마 생성 실패, SQLite로 전환: %s", exc)
+                self._disconnect_postgres()
 
         with self._sqlite() as conn:
             conn.executescript(
