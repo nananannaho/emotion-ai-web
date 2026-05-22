@@ -31,7 +31,12 @@ class AuthService:
     ) -> dict:
         if not username or len(username) < 2:
             return {"success": False, "error": "사용자 이름은 2자 이상이어야 합니다."}
-        if self.user_exists(username):
+        try:
+            exists = self.user_exists(username)
+        except Exception as exc:
+            logger.exception("user_exists 실패: %s", exc)
+            return {"success": False, "error": "데이터베이스 연결 오류입니다. 잠시 후 다시 시도해 주세요."}
+        if exists:
             return {"success": False, "error": "이미 존재하는 사용자입니다."}
 
         embedding = self.encoder.encode(face_image_bgr)

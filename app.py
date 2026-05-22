@@ -56,6 +56,7 @@ def health():
         "light_ml": USE_LIGHT_ML,
         "database": db.backend,
         "database_url_set": bool(DATABASE_URL),
+        "api_version": 2,
     })
 
 

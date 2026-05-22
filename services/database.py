@@ -205,14 +205,18 @@ class Database:
         if not u:
             return False
         if self._postgres:
-            try:
-                with self._pg_cursor() as cur:
-                    cur.execute("SELECT 1 FROM users WHERE username = %s", (u,))
-                    return cur.fetchone() is not None
-            except Exception as exc:
-                logger.error("user_exists 오류: %s", exc)
-                self._pg_rollback()
-                raise
+            for attempt in range(2):
+                try:
+                    self._pg_ensure_alive()
+                    with self._postgres.cursor() as cur:
+                        cur.execute("SELECT 1 FROM users WHERE username = %s", (u,))
+                        return cur.fetchone() is not None
+                except Exception as exc:
+                    logger.error("user_exists 오류 (시도 %s): %s", attempt + 1, exc)
+                    self._pg_rollback()
+                    self._postgres = None
+                    self._connect_postgres()
+            return False
         with self._sqlite() as conn:
             row = conn.execute("SELECT 1 FROM users WHERE username = ?", (u,)).fetchone()
             return row is not None
