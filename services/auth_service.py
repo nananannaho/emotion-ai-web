@@ -39,7 +39,11 @@ class AuthService:
         if exists:
             return {"success": False, "error": "이미 존재하는 사용자입니다."}
 
-        embedding = self.encoder.encode(face_image_bgr)
+        try:
+            embedding = self.encoder.encode(face_image_bgr)
+        except Exception as exc:
+            logger.exception("얼굴 인코딩 오류: %s", exc)
+            return {"success": False, "error": "얼굴 처리 중 오류가 발생했습니다. 사진을 다시 선택해 주세요."}
         if embedding is None:
             return {"success": False, "error": "얼굴을 인식하지 못했습니다. 다시 촬영해 주세요."}
 
