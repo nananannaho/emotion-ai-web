@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5">
+  <meta name="theme-color" content="#6c5ce7">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="format-detection" content="telephone=no">
+  <title>{% block title %}EmotionAI{% endblock %} | 감정 맞춤 챗봇</title>
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <div class="bg-gradient"></div>
+  <div class="bg-orbs">
+    <span class="orb orb-1"></span>
+    <span class="orb orb-2"></span>
+    <span class="orb orb-3"></span>
+  </div>
+
+  <nav class="navbar">
+    <a href="/" class="logo">
+      <span class="logo-icon">◈</span>
+      <span>Emotion<strong>AI</strong></span>
+    </a>
+    <button type="button" class="nav-toggle" aria-label="메뉴 열기" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="nav-links">
+      <a href="/">홈</a>
+      <a href="/login">로그인</a>
+      <a href="/register" class="btn-nav">시작하기</a>
+    </div>
+  </nav>
+
+  {% if is_cloud %}
+  <div class="cloud-banner">
+    🌐 인터넷 공개 서버에서 실행 중입니다. 누구나 이 주소로 접속할 수 있어요.
+    {% if use_light_ml %} (클라우드 경량 AI 모드){% endif %}
+  </div>
+  {% endif %}
+
+  <main class="main-content">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer">
+    <p>동아리 프로젝트 · CNN 감정 인식 · 멀티모달 AI 챗봇</p>
+  </footer>
+
+  <script src="{{ url_for('static', filename='js/mobile-nav.js') }}" defer></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

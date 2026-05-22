@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}대시보드{% endblock %}
+
+{% block content %}
+<section class="dashboard">
+  <header class="dash-header">
+    <div>
+      <h2>안녕하세요, <span id="displayName">{{ user }}</span>님</h2>
+      <p class="dash-sub">실시간 감정 분석과 맞춤 대화를 시작해 보세요.</p>
+    </div>
+    <button type="button" id="logoutBtn" class="btn btn-ghost">로그아웃</button>
+  </header>
+
+  <div class="dash-grid">
+    <aside class="panel emotion-panel glass">
+      <h3>감정 분석 (CNN)</h3>
+      <div class="camera-wrap dash-camera">
+        <video id="dashVideo" autoplay playsinline muted></video>
+        <canvas id="dashCanvas" hidden></canvas>
+        <div id="faceOverlay" class="face-overlay" hidden></div>
+      </div>
+      <p id="dashCameraHint" class="status-text mobile-hint"></p>
+      <button type="button" id="analyzeBtn" class="btn btn-secondary btn-block touch-btn">감정 분석하기</button>
+      <button type="button" id="galleryAnalyzeBtn" class="btn btn-ghost btn-block touch-btn">사진으로 분석 (모바일)</button>
+      <input type="file" id="galleryAnalyzeInput" accept="image/*" capture="user" hidden>
+
+      <div id="emotionResult" class="emotion-result" hidden>
+        <div class="emotion-main">
+          <span id="emotionLabel" class="emotion-badge">—</span>
+          <span id="emotionConfidence" class="confidence">0%</span>
+        </div>
+        <div id="emotionBars" class="emotion-bars"></div>
+        <div class="fusion-box">
+          <h4>멀티모달 융합 결과</h4>
+          <p><strong>통합 감정:</strong> <span id="fusedEmotion">—</span></p>
+          <p><strong>상황:</strong> <span id="situation">—</span></p>
+        </div>
+      </div>
+    </aside>
+
+    <section class="panel chat-panel glass chat-panel-mobile">
+      <h3>맞춤형 AI 챗봇</h3>
+      <div id="chatMessages" class="chat-messages">
+        <div class="msg bot">
+          <p>안녕하세요! 카메라로 감정을 분석한 뒤, 마음을 편하게 나눠 주세요. 감정에 맞는 대화를 도와드릴게요.</p>
+        </div>
+      </div>
+      <form id="chatForm" class="chat-form">
+        <input type="text" id="chatInput" placeholder="메시지를 입력하세요..." autocomplete="off" required>
+        <button type="submit" class="btn btn-primary">전송</button>
+      </form>
+    </section>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.EMOTION_USER = {{ user|tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/camera.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

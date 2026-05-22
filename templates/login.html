@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}로그인{% endblock %}
+
+{% block content %}
+<section class="auth-page">
+  <div class="auth-card glass">
+    <h2>로그인</h2>
+    {% if error %}
+    <p class="error-text">{{ error }}</p>
+    {% endif %}
+
+    <div class="tabs">
+      <button type="button" class="tab active" data-tab="face">얼굴 인식</button>
+      <button type="button" class="tab" data-tab="password">비밀번호</button>
+    </div>
+
+    <div id="tab-face" class="tab-panel active">
+      <div class="camera-block">
+        <div class="camera-wrap">
+          <video id="loginVideo" autoplay playsinline muted></video>
+          <canvas id="loginCanvas" hidden></canvas>
+        </div>
+        <button type="button" id="faceLoginBtn" class="btn btn-primary btn-block touch-btn">얼굴로 로그인</button>
+        <button type="button" id="galleryLoginBtn" class="btn btn-ghost btn-block touch-btn">사진 촬영 / 선택</button>
+        <input type="file" id="galleryLoginInput" accept="image/*" capture="user" hidden>
+        <p id="loginFaceStatus" class="status-text"></p>
+      </div>
+    </div>
+
+    <div id="tab-password" class="tab-panel">
+      <form id="passwordLoginForm" class="auth-form">
+        <label>
+          <span>사용자 이름</span>
+          <input type="text" name="username" required autocomplete="username">
+        </label>
+        <label>
+          <span>비밀번호</span>
+          <input type="password" name="password" required autocomplete="current-password">
+        </label>
+        <button type="submit" class="btn btn-primary btn-block">로그인</button>
+      </form>
+    </div>
+
+    <p class="auth-footer">계정이 없나요? <a href="/register">회원가입</a></p>
+    <p id="loginError" class="error-text" hidden></p>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/camera.js') }}"></script>
+<script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    CameraHelper.init('loginVideo', 'loginCanvas');
+    CameraHelper.bindGalleryButton('galleryLoginBtn', 'galleryLoginInput', 'loginVideo', 'loginFaceStatus');
+    AuthHelper.initLogin();
+  });
+</script>
+{% endblock %}

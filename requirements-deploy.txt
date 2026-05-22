@@ -1,0 +1,8 @@
+# 클라우드 배포용 (Render 등) — TensorFlow 제외, 메모리 절약
+flask>=3.0.0,<4
+flask-cors>=4.0.0
+werkzeug>=3.0.0
+gunicorn>=22.0.0
+numpy>=1.24.0,<3
+opencv-python-headless>=4.8.0
+Pillow>=10.0.0
