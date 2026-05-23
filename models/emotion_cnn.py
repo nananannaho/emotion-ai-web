@@ -155,7 +155,7 @@ class EmotionCNN:
         else:
             distribution = sharpen_distribution(self._heuristic_emotion(face_resized))
 
-        dominant, conf = pick_dominant_emotion(distribution)
+        dominant, conf = pick_dominant_emotion(distribution, face_resized)
         return {
             "success": True,
             "emotion": dominant,
