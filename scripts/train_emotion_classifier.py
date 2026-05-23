@@ -74,6 +74,17 @@ def _load_fer2013(
     return xs, ys
 
 
+def _imread_gray_unicode(path: Path) -> np.ndarray | None:
+    """Windows 한글 경로 — cv2.imread 대신 imdecode 사용."""
+    try:
+        buf = np.fromfile(str(path), dtype=np.uint8)
+        if buf.size == 0:
+            return None
+        return cv2.imdecode(buf, cv2.IMREAD_GRAYSCALE)
+    except Exception:
+        return None
+
+
 def _load_custom_folders() -> tuple[list[np.ndarray], list[int]]:
     if not CUSTOM_DIR.exists():
         return [], []
@@ -81,14 +92,19 @@ def _load_custom_folders() -> tuple[list[np.ndarray], list[int]]:
     faces: list[np.ndarray] = []
     labels: list[int] = []
     label_map = {name: i for i, name in enumerate(EMOTION_LABELS)}
+    skipped = 0
 
     for emo_name, idx in label_map.items():
         folder = CUSTOM_DIR / emo_name
         if not folder.is_dir():
             continue
-        for path in list(folder.glob("*.jpg")) + list(folder.glob("*.png")) + list(folder.glob("*.jpeg")):
-            img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+        for path in sorted(folder.iterdir()):
+            if path.suffix.lower() not in (".jpg", ".jpeg", ".png"):
+                continue
+            img = _imread_gray_unicode(path)
             if img is None:
+                skipped += 1
+                print(f"  [건너뜀] 읽기 실패: {path.name}")
                 continue
             face = cv2.resize(img, (48, 48))
             faces.append(face)
@@ -96,6 +112,8 @@ def _load_custom_folders() -> tuple[list[np.ndarray], list[int]]:
 
     if faces:
         print(f"  직접 촬영 사진: {len(faces)}장 ({CUSTOM_DIR})")
+    if skipped:
+        print(f"  읽기 실패: {skipped}장 (파일 손상·형식 확인)")
     return faces, labels
 
 
