@@ -4,8 +4,8 @@
   "description": "감정 인식 맞춤 챗봇",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0c0e1a",
-  "theme_color": "#6c5ce7",
+  "background_color": "#0b1424",
+  "theme_color": "#101c32",
   "orientation": "portrait-primary",
   "lang": "ko"
 }

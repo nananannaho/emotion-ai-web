@@ -102,7 +102,7 @@ const CameraHelper = (() => {
     );
     if (status) {
       status.textContent = message;
-      status.style.color = "#ff7675";
+      status.style.color = "#d98585";
     }
   }
 

@@ -19,7 +19,7 @@
     }
     el.hidden = false;
     el.textContent = msg;
-    el.style.color = isError ? "#ff7675" : "";
+    el.style.color = isError ? "#d98585" : "";
     if (!isError) {
       statusTimer = setTimeout(() => setStatus(""), 3500);
     }

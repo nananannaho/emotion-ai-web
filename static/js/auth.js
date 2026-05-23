@@ -38,10 +38,10 @@ const AuthHelper = (() => {
       capturedFace = await CameraHelper.captureDataUrl();
       if (capturedFace) {
         status.textContent = "얼굴 촬영 완료! 가입을 진행하세요.";
-        status.style.color = "#55efc4";
+        status.style.color = "#8ec9b0";
       } else {
         status.textContent = "촬영에 실패했습니다. '사진 촬영/선택'을 이용해 주세요.";
-        status.style.color = "#ff7675";
+        status.style.color = "#d98585";
       }
     });
 
