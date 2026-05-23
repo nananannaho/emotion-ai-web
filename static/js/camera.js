@@ -175,7 +175,7 @@ const CameraHelper = (() => {
         const status = statusId ? document.getElementById(statusId) : null;
         if (status) {
           status.textContent = "사진 준비 완료. 가입을 진행하세요.";
-          status.style.color = "#55efc4";
+          status.style.color = "#8ec9b0";
         }
       } catch (e) {
         showCameraHint(e.message || "사진을 불러오지 못했습니다.");
