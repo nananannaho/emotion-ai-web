@@ -240,7 +240,10 @@ class LocalChatEngine:
         if best is None:
             best = self.CANDIDATES[-2]
 
-        text = best.text.format(topic=topic, emotion_ko=emotion_ko)
+        try:
+            text = best.text.format(topic=topic, emotion_ko=emotion_ko)
+        except (KeyError, ValueError):
+            text = best.text.replace("{topic}", topic).replace("{emotion_ko}", emotion_ko)
 
         if display_name and not text.startswith(display_name):
             prefix = f"{display_name}님, "

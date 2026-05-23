@@ -214,6 +214,19 @@ def api_logout():
     return jsonify({"success": True})
 
 
+@app.post("/api/face/update")
+def api_update_face():
+    if not session.get("user"):
+        return jsonify({"success": False, "error": "로그인이 필요합니다."}), 401
+    data = request.get_json(silent=True) or {}
+    image = emotion_service.decode_image(data.get("face_image", ""))
+    if image is None:
+        return jsonify({"success": False, "error": "얼굴 이미지가 필요합니다."}), 400
+    result = auth_service.update_face(session["user"], image)
+    status = 200 if result.get("success") else 400
+    return jsonify(result), status
+
+
 def _lan_ip() -> str | None:
     import socket
 

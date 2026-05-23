@@ -40,7 +40,7 @@ class AuthService:
             return {"success": False, "error": "이미 존재하는 사용자입니다."}
 
         try:
-            embedding = self.encoder.encode(face_image_bgr)
+            embedding = self.encoder.encode_robust(face_image_bgr)
         except Exception as exc:
             logger.exception("얼굴 인코딩 오류: %s", exc)
             return {"success": False, "error": "얼굴 처리 중 오류가 발생했습니다. 사진을 다시 선택해 주세요."}
@@ -88,9 +88,13 @@ class AuthService:
 
         user, score = self.encoder.match_user(face_image_bgr, embeddings)
         if user is None:
+            hint = (
+                f"등록된 얼굴과 일치하지 않습니다. (유사도 {round(score * 100)}%) "
+                "가입할 때와 같이 정면·밝은 곳에서 다시 시도하거나 '사진 촬영/선택'을 이용해 주세요."
+            )
             return {
                 "success": False,
-                "error": "등록된 얼굴과 일치하지 않습니다.",
+                "error": hint,
                 "match_score": round(score, 3),
             }
 
@@ -118,6 +122,17 @@ class AuthService:
 
     def append_chat(self, username: str, role: str, content: str, limit: int = 50):
         self.db.append_chat(username, role, content, limit)
+
+    def update_face(self, username: str, face_image_bgr) -> dict:
+        try:
+            embedding = self.encoder.encode_robust(face_image_bgr)
+        except Exception as exc:
+            logger.exception("얼굴 재등록 오류: %s", exc)
+            return {"success": False, "error": "얼굴 처리 중 오류가 발생했습니다."}
+        if embedding is None:
+            return {"success": False, "error": "얼굴을 인식하지 못했습니다. 정면 사진으로 다시 시도해 주세요."}
+        self.db.save_embedding(username, embedding)
+        return {"success": True, "message": "얼굴이 새로 등록되었습니다."}
 
     @staticmethod
     def public_profile(profile: dict) -> dict:

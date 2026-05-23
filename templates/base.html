@@ -39,19 +39,12 @@
     </div>
   </nav>
 
-  {% if is_cloud %}
-  <div class="cloud-banner">
-    🌐 인터넷 공개 서버에서 실행 중입니다. 누구나 이 주소로 접속할 수 있어요.
-    {% if use_light_ml %} (클라우드 경량 AI 모드){% endif %}
-  </div>
-  {% endif %}
-
   <main class="main-content">
     {% block content %}{% endblock %}
   </main>
 
   <footer class="footer">
-    <p>동아리 프로젝트 · CNN 감정 인식 · 멀티모달 AI 챗봇</p>
+    <p>EmotionAI</p>
   </footer>
 
   <script src="{{ url_for('static', filename='js/api.js') }}"></script>

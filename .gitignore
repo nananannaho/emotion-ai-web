@@ -2,10 +2,11 @@ venv/
 __pycache__/
 *.pyc
 .env
-data/users/*.json
-data/faces/*.npy
 data/emotionai.db
 data/emotionai.db-journal
+data/users/
+data/faces/
 weights/*.keras
+weights/haarcascade*.xml
 .DS_Store
 *.log
