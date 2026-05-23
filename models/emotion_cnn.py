@@ -72,7 +72,8 @@ class EmotionCNN:
 
     def detect_face(self, image_bgr: np.ndarray) -> tuple | None:
         gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
-        faces = self._cascade.detectMultiScale(gray, 1.1, 5, minSize=(40, 40))
+        gray = cv2.equalizeHist(gray)
+        faces = self._cascade.detectMultiScale(gray, 1.08, 4, minSize=(36, 36))
         if len(faces) == 0:
             return None
         x, y, w, h = max(faces, key=lambda f: f[2] * f[3])
@@ -91,17 +92,23 @@ class EmotionCNN:
         return face_norm.reshape(1, *EMOTION_IMG_SIZE, 1)
 
     def _heuristic_emotion(self, face_gray: np.ndarray) -> dict[str, float]:
-        """가중치 없을 때 사용하는 간단한 밝기·대비 기반 추정."""
-        mean = float(np.mean(face_gray))
-        std = float(np.std(face_gray))
+        """경량 모드: CLAHE + 밝기·대비·하단(입) 영역 밝기로 추정."""
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(4, 4))
+        face = clahe.apply(face_gray)
+        mean = float(np.mean(face))
+        std = float(np.std(face))
+        h = face.shape[0]
+        mouth = face[int(h * 0.55) :, :]
+        mouth_bright = float(np.mean(mouth)) if mouth.size else mean
+
         scores = {
-            "happy": max(0.0, (mean - 110) / 80),
-            "sad": max(0.0, (130 - mean) / 80),
-            "angry": max(0.0, (std - 35) / 40),
-            "surprise": max(0.0, (std - 45) / 35),
-            "fear": max(0.0, (120 - mean) / 60) * 0.5,
-            "disgust": 0.15,
-            "neutral": 0.4,
+            "happy": max(0.0, (mouth_bright - mean + 8) / 35) + max(0.0, (mean - 105) / 90),
+            "sad": max(0.0, (125 - mean) / 70),
+            "angry": max(0.0, (std - 32) / 38),
+            "surprise": max(0.0, (std - 40) / 32),
+            "fear": max(0.0, (118 - mean) / 55) * 0.6,
+            "disgust": 0.12,
+            "neutral": 0.35 + max(0.0, 1.0 - std / 50) * 0.2,
         }
         total = sum(scores.values()) or 1.0
         return {k: v / total for k, v in scores.items()}

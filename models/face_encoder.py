@@ -97,7 +97,8 @@ class FaceEncoder:
 
     def extract_face(self, image_bgr: np.ndarray) -> np.ndarray | None:
         gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
-        faces = self._cascade.detectMultiScale(gray, 1.1, 5, minSize=(50, 50))
+        gray = cv2.equalizeHist(gray)
+        faces = self._cascade.detectMultiScale(gray, 1.08, 4, minSize=(36, 36))
         if len(faces) == 0:
             return None
         x, y, w, h = max(faces, key=lambda f: f[2] * f[3])

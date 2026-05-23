@@ -1,6 +1,25 @@
 const AuthHelper = (() => {
   let capturedFace = null;
 
+  const FORBIDDEN_PW = new Set(["*", "&", '"']);
+  const SPECIAL_PW =
+    /[!@#$%^()_+\-=[\]{}|;:',.<>?/\\`~]/;
+
+  function validatePassword(password) {
+    if (!password || password.length < 8) {
+      return "비밀번호는 8자 이상이어야 합니다.";
+    }
+    for (const c of password) {
+      if (FORBIDDEN_PW.has(c)) {
+        return '비밀번호에 *, &, " 문자는 사용할 수 없습니다.';
+      }
+    }
+    if (!SPECIAL_PW.test(password)) {
+      return '비밀번호에 특수문자를 포함해 주세요 (*, &, " 제외).';
+    }
+    return null;
+  }
+
   function showError(elId, msg) {
     const el = document.getElementById(elId);
     if (!el) return;
@@ -39,6 +58,14 @@ const AuthHelper = (() => {
       }
 
       const fd = new FormData(form);
+      const password = fd.get("password") || "";
+      const pwdErr = validatePassword(password);
+      if (pwdErr) {
+        showError("registerError", pwdErr);
+        status.textContent = "";
+        return;
+      }
+
       const btn = form.querySelector('button[type="submit"]');
       btn.disabled = true;
       status.textContent = "서버에 가입 요청 중... (최대 1분)";
@@ -46,7 +73,7 @@ const AuthHelper = (() => {
       try {
         const data = await postJson("/api/register", {
           username: fd.get("username"),
-          password: fd.get("password"),
+          password,
           display_name: fd.get("display_name"),
           face_image: faceImage,
         });

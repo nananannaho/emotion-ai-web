@@ -6,7 +6,6 @@
   <header class="dash-header">
     <div>
       <h2>안녕하세요, <span id="displayName">{{ user }}</span>님</h2>
-      <p class="dash-sub">표정을 보면서 대화해 보세요.</p>
     </div>
     <button type="button" id="logoutBtn" class="btn btn-ghost">로그아웃</button>
   </header>
@@ -17,36 +16,25 @@
         <video id="dashVideo" autoplay playsinline muted></video>
         <canvas id="dashCanvas" hidden></canvas>
         <div id="faceOverlay" class="face-overlay" hidden></div>
+        <div id="liveEmotionChip" class="live-emotion-chip" hidden>
+          <span id="liveEmotionLabel"></span>
+          <span id="liveEmotionConf" class="confidence"></span>
+        </div>
       </div>
-      <div id="liveEmotionChip" class="live-emotion-chip" hidden>
-        <span id="liveEmotionLabel">—</span>
-        <span id="liveEmotionConf" class="confidence"></span>
-      </div>
-      <p id="dashStatus" class="status-text dash-status" aria-live="polite"></p>
+      <p id="dashStatus" class="status-text dash-status" hidden aria-live="polite"></p>
       <div class="dash-actions-row">
         <button type="button" id="analyzeBtn" class="btn btn-secondary touch-btn">표정 분석</button>
         <button type="button" id="galleryAnalyzeBtn" class="btn btn-ghost touch-btn">사진</button>
-        <button type="button" id="refaceBtn" class="btn btn-ghost touch-btn" title="얼굴 로그인이 안 될 때">얼굴 재등록</button>
+        <button type="button" id="refaceBtn" class="btn btn-ghost touch-btn">얼굴 재등록</button>
       </div>
       <input type="file" id="galleryAnalyzeInput" accept="image/*" capture="user" hidden>
-
-      <div id="emotionResult" class="emotion-result emotion-result-compact" hidden>
-        <div class="emotion-main">
-          <span id="emotionLabel" class="emotion-badge">—</span>
-          <span id="emotionConfidence" class="confidence">0%</span>
-        </div>
-        <div id="emotionBars" class="emotion-bars"></div>
-        <div class="fusion-box fusion-box-compact">
-          <p><strong>통합:</strong> <span id="fusedEmotion">—</span> · <span id="situation">—</span></p>
-        </div>
-      </div>
     </div>
 
     <section class="panel chat-panel glass">
       <h3>AI 챗봇</h3>
       <div id="chatMessages" class="chat-messages">
         <div class="msg bot">
-          <p>메시지를내면 표정과 함께 맞춤 답변을 드려요. 위 카메라는 스크롤해도 계속 보입니다.</p>
+          <p>메시지를내면 표정을 반영해 답해 드려요. 표정 분석 결과는 카메라 왼쪽 아래에만 잠깐 표시됩니다.</p>
         </div>
       </div>
       <form id="chatForm" class="chat-form">

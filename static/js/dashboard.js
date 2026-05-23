@@ -4,26 +4,25 @@
     sad: "슬픔", surprise: "놀람", neutral: "평온",
   };
 
-  const SITUATION_KO = {
-    celebration: "기쁨 나누기",
-    casual_positive: "편안한 대화",
-    comfort_needed: "위로 필요",
-    gentle_support: "부드러운 지지",
-    de_escalation: "감정 완화",
-    reassurance: "안심·격려",
-    neutral_chat: "일상 대화",
-    excited_chat: "활기찬 대화",
-    general_support: "일반 지원",
-  };
-
   let lastFusion = { fused_emotion: "neutral", situation: "general_support" };
   let lastAnalyzeAt = 0;
+  let statusTimer = null;
 
   function setStatus(msg, isError = false) {
     const el = document.getElementById("dashStatus");
     if (!el) return;
-    el.textContent = msg || "";
+    clearTimeout(statusTimer);
+    if (!msg) {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    el.hidden = false;
+    el.textContent = msg;
     el.style.color = isError ? "#ff7675" : "";
+    if (!isError) {
+      statusTimer = setTimeout(() => setStatus(""), 3500);
+    }
   }
 
   function updateLiveChip(visual) {
@@ -31,9 +30,16 @@
     const label = document.getElementById("liveEmotionLabel");
     const conf = document.getElementById("liveEmotionConf");
     if (!chip || !visual) return;
-    chip.hidden = false;
-    label.textContent = visual.emotion_ko || EMOTION_KO[visual.emotion] || "—";
+    label.textContent = visual.emotion_ko || EMOTION_KO[visual.emotion] || "";
     conf.textContent = `${Math.round((visual.confidence || 0) * 100)}%`;
+    chip.hidden = false;
+    chip.classList.add("chip-flash");
+    setTimeout(() => chip.classList.remove("chip-flash"), 600);
+  }
+
+  function hideLiveChip() {
+    const chip = document.getElementById("liveEmotionChip");
+    if (chip) chip.hidden = true;
   }
 
   async function loadSession() {
@@ -44,24 +50,6 @@
         document.getElementById("displayName").textContent = data.profile.display_name;
       }
     } catch (_) { /* ignore */ }
-  }
-
-  function renderEmotionBars(distribution) {
-    const container = document.getElementById("emotionBars");
-    if (!container) return;
-    container.innerHTML = "";
-    const sorted = Object.entries(distribution || {}).sort((a, b) => b[1] - a[1]);
-    sorted.slice(0, 5).forEach(([emo, val]) => {
-      const pct = Math.round(val * 100);
-      const row = document.createElement("div");
-      row.className = "bar-row";
-      row.innerHTML = `
-        <span>${EMOTION_KO[emo] || emo}</span>
-        <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
-        <span>${pct}%</span>
-      `;
-      container.appendChild(row);
-    });
   }
 
   function showFaceBox(box) {
@@ -79,6 +67,9 @@
     overlay.style.width = `${box.w * scaleX}px`;
     overlay.style.height = `${box.h * scaleY}px`;
     overlay.hidden = false;
+    setTimeout(() => {
+      if (overlay) overlay.hidden = true;
+    }, 2500);
   }
 
   function applyEmotionResult(data) {
@@ -89,21 +80,11 @@
       situation: fusion.situation,
     };
     lastAnalyzeAt = Date.now();
-
-    document.getElementById("emotionResult").hidden = false;
-    document.getElementById("emotionLabel").textContent =
-      visual.emotion_ko || EMOTION_KO[visual.emotion];
-    document.getElementById("emotionConfidence").textContent =
-      `${Math.round(visual.confidence * 100)}%`;
-    document.getElementById("fusedEmotion").textContent =
-      fusion.fused_emotion_ko || EMOTION_KO[fusion.fused_emotion];
-    document.getElementById("situation").textContent =
-      SITUATION_KO[fusion.situation] || fusion.situation;
-
     updateLiveChip(visual);
-    renderEmotionBars(visual.distribution);
     showFaceBox(visual.face_box);
-    setStatus("표정이 반영되었습니다. 이제 메시지를 보내 보세요.");
+    setStatus(
+      `${visual.emotion_ko || EMOTION_KO[visual.emotion]} (${Math.round(visual.confidence * 100)}%)`
+    );
   }
 
   async function runEmotionAnalyze(silent = false) {
@@ -118,8 +99,7 @@
     const message = document.getElementById("chatInput")?.value?.trim() || "";
 
     if (!img) {
-      const msg = "얼굴이 보이지 않습니다. 카메라 권한을 허용하거나 '사진' 버튼을 사용해 주세요.";
-      setStatus(msg, true);
+      setStatus("얼굴이 보이지 않습니다. 카메라 또는 '사진'을 이용해 주세요.", true);
       if (btn) {
         btn.disabled = false;
         btn.textContent = "표정 분석";
@@ -130,12 +110,14 @@
     try {
       const data = await postJson("/api/emotion/analyze", { image: img, message });
       if (!data.success) {
+        hideLiveChip();
         setStatus(data.error || "얼굴을 찾지 못했습니다. 정면을 바라봐 주세요.", true);
         return false;
       }
       applyEmotionResult(data);
       return true;
     } catch (err) {
+      hideLiveChip();
       setStatus(err.message || "분석 요청에 실패했습니다.", true);
       return false;
     } finally {
@@ -201,7 +183,6 @@
     input.value = "";
 
     if (Date.now() - lastAnalyzeAt > 45000) {
-      setStatus("메시지와 함께 표정을 분석합니다…");
       await runEmotionAnalyze(true);
     }
 
@@ -213,7 +194,6 @@
       });
       if (data.success) {
         appendBotMessage(data.reply);
-        setStatus("");
       } else {
         appendBotMessage(data.error || "응답을 생성하지 못했습니다.");
       }
@@ -228,6 +208,8 @@
   });
 
   document.addEventListener("DOMContentLoaded", async () => {
+    hideLiveChip();
+    setStatus("");
     await CameraHelper.init("dashVideo", "dashCanvas");
     CameraHelper.bindGalleryButton(
       "galleryAnalyzeBtn",
@@ -236,6 +218,5 @@
       "dashStatus"
     );
     await loadSession();
-    setStatus("정면을 보면서 대화해 보세요. 필요하면 '표정 분석'을 누르세요.");
   });
 })();

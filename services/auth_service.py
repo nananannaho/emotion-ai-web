@@ -9,6 +9,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from models.face_encoder import FaceEncoder
 from services.database import get_db
+from utils.password_validation import validate_password
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,10 @@ class AuthService:
             return {"success": False, "error": "데이터베이스 연결 오류입니다. 잠시 후 다시 시도해 주세요."}
         if exists:
             return {"success": False, "error": "이미 존재하는 사용자입니다."}
+
+        pwd_err = validate_password(password)
+        if pwd_err:
+            return {"success": False, "error": pwd_err}
 
         try:
             embedding = self.encoder.encode_robust(face_image_bgr)
