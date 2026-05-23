@@ -25,13 +25,19 @@
     }
   }
 
-  function updateLiveChip(visual) {
+  function updateLiveChip(visual, fusion) {
     const chip = document.getElementById("liveEmotionChip");
     const label = document.getElementById("liveEmotionLabel");
     const conf = document.getElementById("liveEmotionConf");
     if (!chip || !visual) return;
-    label.textContent = visual.emotion_ko || EMOTION_KO[visual.emotion] || "";
-    conf.textContent = `${Math.round((visual.confidence || 0) * 100)}%`;
+    const emoKo =
+      fusion?.fused_emotion_ko ||
+      visual.emotion_ko ||
+      EMOTION_KO[fusion?.fused_emotion || visual.emotion] ||
+      "";
+    const confVal = fusion?.confidence ?? visual.confidence ?? 0;
+    label.textContent = emoKo;
+    conf.textContent = `${Math.round(confVal * 100)}%`;
     chip.hidden = false;
     chip.classList.add("chip-flash");
     setTimeout(() => chip.classList.remove("chip-flash"), 600);
@@ -80,11 +86,13 @@
       situation: fusion.situation,
     };
     lastAnalyzeAt = Date.now();
-    updateLiveChip(visual);
+    updateLiveChip(visual, fusion);
     showFaceBox(visual.face_box);
-    setStatus(
-      `${visual.emotion_ko || EMOTION_KO[visual.emotion]} (${Math.round(visual.confidence * 100)}%)`
-    );
+    const label =
+      fusion.fused_emotion_ko ||
+      visual.emotion_ko ||
+      EMOTION_KO[fusion.fused_emotion];
+    setStatus(`표정 분석: ${label} (챗봇에 반영됨)`);
   }
 
   async function runEmotionAnalyze(silent = false) {

@@ -54,14 +54,19 @@ def inject_globals():
 
 @app.get("/health")
 def health():
+    from pathlib import Path
+
+    from config import WEIGHTS_DIR
+
     db = get_db()
     return jsonify({
         "status": "ok",
         "cloud": IS_CLOUD,
         "light_ml": USE_LIGHT_ML,
+        "emotion_ml": (WEIGHTS_DIR / "emotion_clf.joblib").exists(),
         "database": db.backend,
         "database_url_set": bool(DATABASE_URL),
-        "api_version": 2,
+        "api_version": 3,
     })
 
 

@@ -6,14 +6,19 @@ print("EmotionAI 모델 초기화를 시작합니다...")
 print("TensorFlow 설치 여부를 확인합니다. (처음 실행 시 시간이 걸릴 수 있습니다)\n")
 
 try:
+    import subprocess
+
     from models.emotion_cnn import EmotionCNN
     from models.face_encoder import FaceEncoder
 
-    print("[1/2] 감정 분류 CNN 학습·저장...")
+    print("[1/3] 감정 ML 분류기 학습 (scikit-learn, Render용)...")
+    subprocess.check_call([sys.executable, "scripts/train_emotion_classifier.py"])
+
+    print("[2/3] 감정 분류 CNN 학습·저장 (로컬 TensorFlow용)...")
     path1 = EmotionCNN.train_minimal_weights(epochs=2)
     print(f"  → 저장 완료: {path1}\n")
 
-    print("[2/2] 얼굴 인코더 CNN 저장...")
+    print("[3/3] 얼굴 인코더 CNN 저장...")
     path2 = FaceEncoder.train_minimal_weights()
     print(f"  → 저장 완료: {path2}\n")
 

@@ -9,6 +9,7 @@ import cv2
 import numpy as np
 
 from config import EMOTION_IMG_SIZE, EMOTION_LABELS, USE_LIGHT_ML, WEIGHTS_DIR
+from models.emotion_ml import EmotionMLClassifier
 from utils.opencv_utils import get_face_cascade
 
 logger = logging.getLogger(__name__)
@@ -55,6 +56,7 @@ class EmotionCNN:
     def __init__(self):
         self._model = None
         self._cascade = get_face_cascade()
+        self._ml = EmotionMLClassifier()
 
     def _ensure_model(self):
         if self._model is not None:
@@ -101,14 +103,18 @@ class EmotionCNN:
         mouth = face[int(h * 0.55) :, :]
         mouth_bright = float(np.mean(mouth)) if mouth.size else mean
 
+        eye = face[: h // 3, :]
+        eye_mean = float(np.mean(eye)) if eye.size else mean
+        brow_gap = abs(float(np.mean(face[h // 4 : h // 3, :])) - eye_mean)
+
         scores = {
-            "happy": max(0.0, (mouth_bright - mean + 8) / 35) + max(0.0, (mean - 105) / 90),
-            "sad": max(0.0, (125 - mean) / 70),
-            "angry": max(0.0, (std - 32) / 38),
-            "surprise": max(0.0, (std - 40) / 32),
-            "fear": max(0.0, (118 - mean) / 55) * 0.6,
-            "disgust": 0.12,
-            "neutral": 0.35 + max(0.0, 1.0 - std / 50) * 0.2,
+            "happy": max(0.0, (mouth_bright - mean + 10) / 28),
+            "sad": max(0.0, (120 - mean) / 55) + max(0.0, (eye_mean - mouth_bright) / 40),
+            "angry": max(0.0, (std - 28) / 35) + max(0.0, brow_gap / 25),
+            "surprise": max(0.0, (std - 38) / 28) * max(0.0, (mouth_bright - mean + 5) / 20),
+            "fear": max(0.0, (115 - mean) / 50) * 0.8,
+            "disgust": max(0.0, (mean - mouth_bright) / 40) * 0.5,
+            "neutral": 0.28 + max(0.0, 1.0 - abs(std - 30) / 30) * 0.25,
         }
         total = sum(scores.values()) or 1.0
         return {k: v / total for k, v in scores.items()}
@@ -132,6 +138,15 @@ class EmotionCNN:
             tensor = tensor.reshape(1, *EMOTION_IMG_SIZE, 1)
             probs = self._model.predict(tensor, verbose=0)[0]
             distribution = {EMOTION_LABELS[i]: float(probs[i]) for i in range(len(EMOTION_LABELS))}
+        elif self._ml.available:
+            dist_ml = self._ml.predict_distribution(face_resized)
+            dist_heur = self._heuristic_emotion(face_resized)
+            distribution = {
+                emo: 0.75 * dist_ml.get(emo, 0) + 0.25 * dist_heur.get(emo, 0)
+                for emo in EMOTION_LABELS
+            }
+            total = sum(distribution.values()) or 1.0
+            distribution = {k: v / total for k, v in distribution.items()}
         else:
             distribution = self._heuristic_emotion(face_resized)
 

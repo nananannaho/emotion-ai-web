@@ -75,20 +75,49 @@ class MultiModalFusion:
         return {k: v / total for k, v in bias.items()}
 
     def fuse(self, data: FusionInput) -> dict:
+        visual_dist = data.visual_distribution or {data.visual_emotion: data.visual_confidence}
+        msg = (data.text_message or "").strip()
+
+        # 표정만 분석할 때: 채팅에 쓰일 감정 = 표정 결과 (평온으로 눌리지 않음)
+        if not msg:
+            final_emotion = data.visual_emotion
+            confidence = float(visual_dist.get(final_emotion, data.visual_confidence))
+            text_emotion = "neutral"
+            situation_key = (final_emotion, "neutral")
+            situation = self.SITUATION_MAP.get(
+                situation_key,
+                self.SITUATION_MAP.get((final_emotion, "neutral"), "general_support"),
+            )
+            return {
+                "fused_emotion": final_emotion,
+                "fused_emotion_ko": EMOTION_LABELS_KO.get(final_emotion, final_emotion),
+                "confidence": round(confidence, 4),
+                "distribution": {k: round(v, 4) for k, v in visual_dist.items()},
+                "modal_breakdown": {
+                    "visual": data.visual_emotion,
+                    "text": text_emotion,
+                    "visual_confidence": data.visual_confidence,
+                },
+                "situation": situation,
+                "session_context": data.session_context or situation,
+            }
+
         text_emotion, text_dist = self.analyze_text(data.text_message)
         profile_dist = self._profile_emotion_bias(
             data.user_mood_history, data.user_preferences
         )
 
-        visual_dist = data.visual_distribution or {data.visual_emotion: data.visual_confidence}
-        all_emotions = set(visual_dist) | set(text_dist) | set(profile_dist)
+        visual_w = min(0.7, 0.45 + data.visual_confidence * 0.35)
+        text_w = 0.25
+        profile_w = max(0.05, 1.0 - visual_w - text_w)
 
+        all_emotions = set(visual_dist) | set(text_dist) | set(profile_dist)
         fused = {}
         for emo in all_emotions:
             fused[emo] = (
-                self.WEIGHTS["visual"] * visual_dist.get(emo, 0)
-                + self.WEIGHTS["text"] * text_dist.get(emo, 0)
-                + self.WEIGHTS["profile"] * profile_dist.get(emo, 0)
+                visual_w * visual_dist.get(emo, 0)
+                + text_w * text_dist.get(emo, 0)
+                + profile_w * profile_dist.get(emo, 0)
             )
 
         total = sum(fused.values()) or 1

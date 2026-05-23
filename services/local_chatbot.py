@@ -12,6 +12,7 @@ API 없이 동작하는 자체 챗봇 엔진.
 
 from __future__ import annotations
 
+import random
 import re
 from dataclasses import dataclass, field
 
@@ -26,6 +27,35 @@ class ResponseCandidate:
 
 
 class LocalChatEngine:
+    EMOTION_LEADS: dict[str, list[str]] = {
+        "happy": [
+            "표정에서 기쁨이 많이 느껴져요.",
+            "지금 얼굴 표정이 밝아 보여요.",
+        ],
+        "sad": [
+            "지금 표정이 조금 무거워 보여요.",
+            "표정에서 슬픔이 느껴져요. 괜찮아요, 천천히 말해 주세요.",
+        ],
+        "angry": [
+            "표정에서 화가 난 기분이 조금 보여요.",
+            "지금 많이 답답하신 것 같아요.",
+        ],
+        "fear": [
+            "표정이 조금 긴장된 것 같아요.",
+            "불안해 보이는 표정이에요. 함께 정리해 봐요.",
+        ],
+        "surprise": [
+            "놀란 표정이 보여요!",
+            "표정이 조금 놀라신 것 같아요.",
+        ],
+        "neutral": [
+            "지금은 비교적 차분한 표정이에요.",
+        ],
+        "disgust": [
+            "표정이 조금 불편해 보이는 것 같아요.",
+        ],
+    }
+
     INTENT_KEYWORDS: dict[str, list[str]] = {
         "greeting": ["안녕", "하이", "헬로", "반가", "처음"],
         "thanks": ["고마", "감사", "thank"],
@@ -209,7 +239,10 @@ class LocalChatEngine:
                 score += 1.5
 
         if cand.text in recent_bot_replies:
-            score -= 5.0
+            score -= 12.0
+        for old in recent_bot_replies[-3:]:
+            if old and cand.text[:40] == old[:40]:
+                score -= 8.0
 
         return score
 
@@ -226,30 +259,35 @@ class LocalChatEngine:
         intents = self.detect_intents(user_message)
         topic = self.extract_topic_snippet(user_message)
 
-        best: ResponseCandidate | None = None
-        best_score = -1.0
-
+        scored: list[tuple[float, ResponseCandidate]] = []
         for cand in self.CANDIDATES:
             s = self.score_candidate(
                 cand, intents, fused_emotion, situation, user_message, recent
             )
-            if s > best_score:
-                best_score = s
-                best = cand
+            scored.append((s, cand))
 
-        if best is None:
+        scored.sort(key=lambda x: x[0], reverse=True)
+        top = scored[:6]
+        if not top:
             best = self.CANDIDATES[-2]
+        else:
+            weights = [max(0.05, s + 1.0) for s, _ in top]
+            best = random.choices([c for _, c in top], weights=weights, k=1)[0]
 
         try:
             text = best.text.format(topic=topic, emotion_ko=emotion_ko)
         except (KeyError, ValueError):
             text = best.text.replace("{topic}", topic).replace("{emotion_ko}", emotion_ko)
 
+        leads = self.EMOTION_LEADS.get(fused_emotion, [])
+        if leads and user_message.strip() and random.random() < 0.55:
+            text = f"{random.choice(leads)} {text}"
+
         if display_name and not text.startswith(display_name):
             prefix = f"{display_name}님, "
             if intents == ["greeting"]:
                 text = f"{prefix}{text}"
-            elif user_message.strip() and "general" not in best.intents[:1]:
+            elif user_message.strip() and "general" not in (best.intents[:1] or []):
                 text = f"{prefix}{text}"
 
         detected = ", ".join(intents[:3])
