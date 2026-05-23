@@ -9,6 +9,7 @@ import cv2
 import numpy as np
 
 from config import EMOTION_IMG_SIZE, EMOTION_LABELS, USE_LIGHT_ML, WEIGHTS_DIR
+from models.emotion_infer import pick_dominant_emotion, prepare_face_gray, sharpen_distribution
 from models.emotion_ml import EmotionMLClassifier
 from utils.opencv_utils import get_face_cascade
 
@@ -109,12 +110,12 @@ class EmotionCNN:
 
         scores = {
             "happy": max(0.0, (mouth_bright - mean + 10) / 28),
-            "sad": max(0.0, (120 - mean) / 55) + max(0.0, (eye_mean - mouth_bright) / 40),
-            "angry": max(0.0, (std - 28) / 35) + max(0.0, brow_gap / 25),
+            "sad": max(0.0, (120 - mean) / 45) + max(0.0, (eye_mean - mouth_bright) / 32),
+            "angry": max(0.0, (std - 24) / 28) + max(0.0, brow_gap / 20),
             "surprise": max(0.0, (std - 38) / 28) * max(0.0, (mouth_bright - mean + 5) / 20),
             "fear": max(0.0, (115 - mean) / 50) * 0.8,
             "disgust": max(0.0, (mean - mouth_bright) / 40) * 0.5,
-            "neutral": 0.28 + max(0.0, 1.0 - abs(std - 30) / 30) * 0.25,
+            "neutral": 0.12 + max(0.0, 1.0 - abs(std - 30) / 30) * 0.18,
         }
         total = sum(scores.values()) or 1.0
         return {k: v / total for k, v in scores.items()}
@@ -130,7 +131,7 @@ class EmotionCNN:
         x, y, w, h = box
         face = image_bgr[y : y + h, x : x + w]
         face_gray = cv2.cvtColor(face, cv2.COLOR_BGR2GRAY)
-        face_resized = cv2.resize(face_gray, EMOTION_IMG_SIZE)
+        face_resized = prepare_face_gray(cv2.resize(face_gray, EMOTION_IMG_SIZE))
 
         if WEIGHTS_PATH.exists() and not USE_LIGHT_ML:
             self._ensure_model()
@@ -139,23 +140,26 @@ class EmotionCNN:
             probs = self._model.predict(tensor, verbose=0)[0]
             distribution = {EMOTION_LABELS[i]: float(probs[i]) for i in range(len(EMOTION_LABELS))}
         elif self._ml.available:
-            dist_ml = self._ml.predict_distribution(face_resized)
-            dist_heur = self._heuristic_emotion(face_resized)
-            ml_w = 0.85 if self._ml.fer_trained else 0.75
-            distribution = {
-                emo: ml_w * dist_ml.get(emo, 0) + (1.0 - ml_w) * dist_heur.get(emo, 0)
-                for emo in EMOTION_LABELS
-            }
-            total = sum(distribution.values()) or 1.0
-            distribution = {k: v / total for k, v in distribution.items()}
+            dist_ml = sharpen_distribution(self._ml.predict_distribution(face_resized))
+            if self._ml.fer_trained:
+                distribution = dist_ml
+            else:
+                dist_heur = self._heuristic_emotion(face_resized)
+                distribution = {
+                    emo: 0.8 * dist_ml.get(emo, 0) + 0.2 * dist_heur.get(emo, 0)
+                    for emo in EMOTION_LABELS
+                }
+                total = sum(distribution.values()) or 1.0
+                distribution = {k: v / total for k, v in distribution.items()}
+                distribution = sharpen_distribution(distribution)
         else:
-            distribution = self._heuristic_emotion(face_resized)
+            distribution = sharpen_distribution(self._heuristic_emotion(face_resized))
 
-        dominant = max(distribution, key=distribution.get)
+        dominant, conf = pick_dominant_emotion(distribution)
         return {
             "success": True,
             "emotion": dominant,
-            "confidence": float(distribution[dominant]),
+            "confidence": float(conf),
             "distribution": distribution,
             "face_box": {"x": x, "y": y, "w": w, "h": h},
         }

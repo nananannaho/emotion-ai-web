@@ -25,8 +25,15 @@ window.postJson = async function postJson(url, body, timeoutMs = 90000) {
       throw new Error(`서버 오류 (${res.status}). 잠시 후 다시 시도해 주세요.`);
     }
 
-    if (!res.ok && data.error === undefined) {
-      data = { success: false, error: data.error || `요청 실패 (${res.status})` };
+    if (!res.ok) {
+      const msg =
+        data.error ||
+        (res.status === 401
+          ? "로그인에 실패했습니다."
+          : res.status === 413
+            ? "사진 용량이 너무 큽니다. 다시 촬영해 주세요."
+            : `요청 실패 (${res.status})`);
+      return { success: false, error: msg, ...data };
     }
     return data;
   } catch (err) {

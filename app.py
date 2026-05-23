@@ -66,7 +66,7 @@ def health():
         "emotion_ml": (WEIGHTS_DIR / "emotion_clf.joblib").exists(),
         "database": db.backend,
         "database_url_set": bool(DATABASE_URL),
-        "api_version": 3,
+        "api_version": 4,
     })
 
 
@@ -149,16 +149,30 @@ def api_login_password():
 
 @app.post("/api/login/face")
 def api_login_face():
-    data = request.get_json(silent=True) or {}
-    image = emotion_service.decode_image(data.get("face_image", ""))
-    if image is None:
-        return jsonify({"success": False, "error": "얼굴 이미지가 필요합니다."}), 400
+    try:
+        data = request.get_json(silent=True) or {}
+    except Exception:
+        return jsonify({
+            "success": False,
+            "error": "요청 데이터가 너무 큽니다. 사진을 다시 선택해 주세요.",
+        }), 413
 
-    result = auth_service.login_face(image)
-    if result.get("success"):
-        session["user"] = result["profile"]["username"]
-    status = 200 if result.get("success") else 401
-    return jsonify(result), status
+    try:
+        image = emotion_service.decode_image(data.get("face_image", ""))
+        if image is None:
+            return jsonify({"success": False, "error": "얼굴 이미지가 필요합니다."}), 400
+
+        result = auth_service.login_face(image)
+        if result.get("success"):
+            session["user"] = result["profile"]["username"]
+        status = 200 if result.get("success") else 401
+        return jsonify(result), status
+    except Exception as exc:
+        logger.exception("얼굴 로그인 API 오류: %s", exc)
+        return jsonify({
+            "success": False,
+            "error": "로그인 처리 중 서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+        }), 500
 
 
 @app.post("/api/emotion/analyze")

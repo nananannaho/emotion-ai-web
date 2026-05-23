@@ -9,6 +9,7 @@ import numpy as np
 
 from config import EMOTION_LABELS, WEIGHTS_DIR
 from models.emotion_features import extract_face_features
+from models.emotion_infer import prepare_face_gray
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,8 @@ class EmotionMLClassifier:
     def predict_distribution(self, face_gray: np.ndarray) -> dict[str, float]:
         if not self._model:
             return {}
-        feat = extract_face_features(face_gray).reshape(1, -1)
+        face = prepare_face_gray(face_gray)
+        feat = extract_face_features(face).reshape(1, -1)
         if hasattr(self._model, "predict_proba"):
             probs = self._model.predict_proba(feat)[0]
             classes = self._model.classes_

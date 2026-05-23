@@ -7,8 +7,8 @@ const CameraHelper = (() => {
   let canvasEl = null;
   let lastDataUrl = null;
 
-  const MAX_UPLOAD_WIDTH = 640;
-  const JPEG_QUALITY = 0.72;
+  const MAX_UPLOAD_WIDTH = 480;
+  const JPEG_QUALITY = 0.68;
 
   const isMobile = () =>
     /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||

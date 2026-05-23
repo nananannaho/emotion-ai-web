@@ -105,18 +105,21 @@ const AuthHelper = (() => {
 
     document.getElementById("faceLoginBtn")?.addEventListener("click", async () => {
       const status = document.getElementById("loginFaceStatus");
+      const btn = document.getElementById("faceLoginBtn");
       showError("loginError", "");
-      status.textContent = "얼굴 인식 중...";
+      status.textContent = "얼굴 인식 중... (최대 1분)";
+      if (btn) btn.disabled = true;
 
       const img = await CameraHelper.captureDataUrl();
       if (!img) {
         showError("loginError", "사진을 가져올 수 없습니다. '사진 촬영/선택'을 이용해 주세요.");
         status.textContent = "";
+        if (btn) btn.disabled = false;
         return;
       }
 
       try {
-        const data = await postJson("/api/login/face", { face_image: img });
+        const data = await postJson("/api/login/face", { face_image: img }, 120000);
         if (data.success) {
           status.textContent = `인식 성공 (${(data.match_score * 100).toFixed(0)}%)`;
           window.location.href = "/dashboard";
@@ -127,6 +130,8 @@ const AuthHelper = (() => {
       } catch (err) {
         showError("loginError", err.message || "서버 연결에 실패했습니다.");
         status.textContent = "";
+      } finally {
+        if (btn) btn.disabled = false;
       }
     });
 

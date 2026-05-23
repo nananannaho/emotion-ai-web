@@ -145,17 +145,27 @@ class FaceEncoder:
             return FACE_MATCH_THRESHOLD_LIGHT, FACE_MATCH_MARGIN_LIGHT
         return FACE_MATCH_THRESHOLD, FACE_MATCH_MARGIN
 
+    def _login_embeddings(self, image_bgr: np.ndarray) -> list[np.ndarray]:
+        """로그인: 원본 + 좌우반전 중 더 나은 매칭."""
+        out: list[np.ndarray] = []
+        for img in (image_bgr, cv2.flip(image_bgr, 1)):
+            emb = self.encode(img)
+            if emb is not None:
+                out.append(emb)
+        return out
+
     def match_user(
         self, image_bgr: np.ndarray, stored_embeddings: dict[str, np.ndarray]
     ) -> tuple[str | None, float]:
-        current = self.encode(image_bgr)
-        if current is None:
+        currents = self._login_embeddings(image_bgr)
+        if not currents:
             return None, 0.0
 
         threshold, margin = self._match_thresholds()
         scores: list[tuple[str, float]] = []
         for username, embedding in stored_embeddings.items():
-            scores.append((username, self.cosine_similarity(current, embedding)))
+            best = max(self.cosine_similarity(cur, embedding) for cur in currents)
+            scores.append((username, best))
         scores.sort(key=lambda x: x[1], reverse=True)
 
         best_user, best_score = scores[0]

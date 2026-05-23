@@ -87,11 +87,27 @@ class AuthService:
         return {"success": True, "profile": self.public_profile(profile)}
 
     def login_face(self, face_image_bgr) -> dict:
-        embeddings = self.db.get_all_embeddings()
+        try:
+            embeddings = self.db.get_all_embeddings()
+        except Exception as exc:
+            logger.exception("얼굴 DB 조회 실패: %s", exc)
+            return {
+                "success": False,
+                "error": "데이터베이스 연결 오류입니다. 잠시 후 다시 시도해 주세요.",
+            }
+
         if not embeddings:
             return {"success": False, "error": "등록된 얼굴 데이터가 없습니다."}
 
-        user, score = self.encoder.match_user(face_image_bgr, embeddings)
+        try:
+            user, score = self.encoder.match_user(face_image_bgr, embeddings)
+        except Exception as exc:
+            logger.exception("얼굴 매칭 오류: %s", exc)
+            return {
+                "success": False,
+                "error": "얼굴 인식 처리 중 오류가 발생했습니다. 사진을 다시 선택해 주세요.",
+            }
+
         if user is None:
             hint = (
                 f"등록된 얼굴과 일치하지 않습니다. (유사도 {round(score * 100)}%) "
@@ -104,6 +120,9 @@ class AuthService:
             }
 
         profile = self.db.get_user_full(user)
+        if not profile:
+            return {"success": False, "error": "사용자 정보를 찾을 수 없습니다."}
+
         return {
             "success": True,
             "profile": self.public_profile(profile),
