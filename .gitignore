@@ -7,8 +7,9 @@ data/emotionai.db-journal
 data/users/
 data/faces/
 data/fer2013/
-data/emotions/*/
+data/emotions/*/*
 !data/emotions/README.md
+!data/emotions/*/.gitkeep
 weights/*.keras
 weights/haarcascade*.xml
 .DS_Store

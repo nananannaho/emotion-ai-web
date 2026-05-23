@@ -145,24 +145,13 @@ def main():
         X, y, test_size=0.15, random_state=42, stratify=y
     )
 
-    # 분노(0)·혐오(1) recall 강화 — 웹캠에서 가장 자주 놓침
-    class_weight = {
-        0: 2.4,  # angry
-        1: 1.5,  # disgust
-        2: 1.2,  # fear
-        3: 0.92,  # happy
-        4: 1.15,  # sad
-        5: 1.1,  # surprise
-        6: 0.88,  # neutral
-    }
-
     # GitHub 파일 100MB 제한 — 트리 수·깊이를 제한해 joblib 크기 유지
     clf = RandomForestClassifier(
         n_estimators=120,
         max_depth=18,
         max_features="sqrt",
         min_samples_leaf=3,
-        class_weight=class_weight,
+        class_weight="balanced_subsample",
         random_state=42,
         n_jobs=-1,
     )
