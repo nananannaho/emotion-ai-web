@@ -6,6 +6,7 @@
   <header class="dash-header">
     <div>
       <h2>안녕하세요, <span id="displayName">{{ user }}</span>님</h2>
+      <p class="dash-sub">표정을 분석한 뒤 채팅하면 감정에 맞는 답변을 받을 수 있어요.</p>
     </div>
     <button type="button" id="logoutBtn" class="btn btn-ghost">로그아웃</button>
   </header>
@@ -17,6 +18,7 @@
         <canvas id="dashCanvas" hidden></canvas>
         <div id="faceOverlay" class="face-overlay" hidden></div>
         <div id="liveEmotionChip" class="live-emotion-chip" hidden>
+          <span id="liveEmotionEmoji" class="chip-emoji" aria-hidden="true"></span>
           <span id="liveEmotionLabel"></span>
           <span id="liveEmotionConf" class="confidence"></span>
         </div>
@@ -31,15 +33,41 @@
     </div>
 
     <section class="panel chat-panel glass">
-      <h3>AI 챗봇</h3>
-      <div id="chatMessages" class="chat-messages">
+      <header class="chat-panel-header">
+        <h3>AI 챗봇</h3>
+        <div id="chatEmotionBadge" class="chat-emotion-badge" hidden>
+          <span id="chatEmotionEmoji" aria-hidden="true"></span>
+          <span id="chatEmotionLabel">평온</span>
+        </div>
+      </header>
+
+      <div id="chatMessages" class="chat-messages" role="log" aria-live="polite">
         <div class="msg bot">
-          <p>메시지를내면 표정을 반영해 답해 드려요. 표정 분석 결과는 카메라 왼쪽 아래에만 잠깐 표시됩니다.</p>
+          <span class="msg-avatar" aria-hidden="true">🤖</span>
+          <div class="msg-body">
+            <p>😌 안녕하세요! 먼저 <strong>표정 분석</strong>을 누르거나, 아래 <strong>표정 반영</strong>을 눌러 주세요. 그다음 메시지를 내면 지금 기분에 맞게 답해 드릴게요.</p>
+          </div>
         </div>
       </div>
+
+      <div id="chatTyping" class="chat-typing" hidden aria-hidden="true">
+        <span class="msg-avatar">🤖</span>
+        <span class="typing-dots"><span></span><span></span><span></span></span>
+      </div>
+
       <form id="chatForm" class="chat-form">
-        <input type="text" id="chatInput" placeholder="메시지 입력..." autocomplete="off" required>
-        <button type="submit" class="btn btn-primary">전송</button>
+        <label class="sr-only" for="chatInput">메시지</label>
+        <textarea
+          id="chatInput"
+          rows="1"
+          placeholder="메시지를 입력하세요 (Enter 전송)"
+          autocomplete="off"
+          required
+        ></textarea>
+        <div class="chat-form-actions">
+          <button type="button" id="syncEmotionBtn" class="btn btn-ghost btn-sm touch-btn">표정 반영</button>
+          <button type="submit" id="chatSendBtn" class="btn btn-primary touch-btn">전송</button>
+        </div>
       </form>
     </section>
   </div>

@@ -34,6 +34,19 @@ EMOTION_LABELS_KO = {
     "neutral": "평온",
 }
 
+# 분석된 감정에 맞는 챗봇 이모티콘
+EMOTION_EMOJI = {
+    "angry": "😤",
+    "disgust": "😣",
+    "fear": "😰",
+    "happy": "😊",
+    "sad": "😢",
+    "surprise": "😲",
+    "neutral": "😌",
+}
+
+CHATBOT_AVATAR = "🤖"
+
 FACE_MATCH_THRESHOLD = 0.72
 FACE_MATCH_THRESHOLD_LIGHT = 0.74
 FACE_MATCH_MARGIN = 0.08

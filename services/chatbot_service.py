@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from config import EMOTION_LABELS_KO
+from config import CHATBOT_AVATAR, EMOTION_EMOJI, EMOTION_LABELS_KO
 from services.local_chatbot import LocalChatEngine
 
 
@@ -19,7 +19,7 @@ class ChatbotService:
         chat_history: list[dict] | None = None,
     ) -> dict:
         emotion_ko = EMOTION_LABELS_KO.get(fused_emotion, fused_emotion)
-        return self._engine.generate(
+        result = self._engine.generate(
             user_message=user_message,
             fused_emotion=fused_emotion,
             situation=situation,
@@ -27,3 +27,6 @@ class ChatbotService:
             display_name=display_name,
             chat_history=chat_history,
         )
+        result.setdefault("emotion_emoji", EMOTION_EMOJI.get(fused_emotion, "💬"))
+        result.setdefault("bot_avatar", CHATBOT_AVATAR)
+        return result

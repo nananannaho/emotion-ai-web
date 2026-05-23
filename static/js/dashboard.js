@@ -1,12 +1,37 @@
 (function () {
   const EMOTION_KO = {
-    angry: "분노", disgust: "혐오", fear: "불안", happy: "기쁨",
-    sad: "슬픔", surprise: "놀람", neutral: "평온",
+    angry: "분노",
+    disgust: "혐오",
+    fear: "불안",
+    happy: "기쁨",
+    sad: "슬픔",
+    surprise: "놀람",
+    neutral: "평온",
   };
+
+  const EMOTION_EMOJI = {
+    angry: "😤",
+    disgust: "😣",
+    fear: "😰",
+    happy: "😊",
+    sad: "😢",
+    surprise: "😲",
+    neutral: "😌",
+  };
+
+  const BOT_AVATAR = "🤖";
 
   let lastFusion = { fused_emotion: "neutral", situation: "general_support" };
   let lastAnalyzeAt = 0;
   let statusTimer = null;
+
+  function scrollChatToBottom() {
+    const box = document.getElementById("chatMessages");
+    if (!box) return;
+    requestAnimationFrame(() => {
+      box.scrollTop = box.scrollHeight;
+    });
+  }
 
   function setStatus(msg, isError = false) {
     const el = document.getElementById("dashStatus");
@@ -25,27 +50,52 @@
     }
   }
 
+  function updateChatEmotionBadge(emotion, emotionKo) {
+    const badge = document.getElementById("chatEmotionBadge");
+    const emojiEl = document.getElementById("chatEmotionEmoji");
+    const labelEl = document.getElementById("chatEmotionLabel");
+    if (!badge || !emojiEl || !labelEl) return;
+    const em = emotion || "neutral";
+    emojiEl.textContent = EMOTION_EMOJI[em] || "💬";
+    labelEl.textContent = emotionKo || EMOTION_KO[em] || "평온";
+    badge.hidden = false;
+  }
+
   function updateLiveChip(visual, fusion) {
     const chip = document.getElementById("liveEmotionChip");
+    const emojiEl = document.getElementById("liveEmotionEmoji");
     const label = document.getElementById("liveEmotionLabel");
     const conf = document.getElementById("liveEmotionConf");
     if (!chip || !visual) return;
+
+    const emo = fusion?.fused_emotion || visual.emotion;
     const emoKo =
       fusion?.fused_emotion_ko ||
       visual.emotion_ko ||
-      EMOTION_KO[fusion?.fused_emotion || visual.emotion] ||
+      EMOTION_KO[emo] ||
       "";
     const confVal = fusion?.confidence ?? visual.confidence ?? 0;
+
+    if (emojiEl) emojiEl.textContent = EMOTION_EMOJI[emo] || "";
     label.textContent = emoKo;
     conf.textContent = `${Math.round(confVal * 100)}%`;
     chip.hidden = false;
     chip.classList.add("chip-flash");
     setTimeout(() => chip.classList.remove("chip-flash"), 600);
+
+    updateChatEmotionBadge(emo, emoKo);
   }
 
   function hideLiveChip() {
     const chip = document.getElementById("liveEmotionChip");
     if (chip) chip.hidden = true;
+  }
+
+  function showTyping(show) {
+    const el = document.getElementById("chatTyping");
+    if (!el) return;
+    el.hidden = !show;
+    if (show) scrollChatToBottom();
   }
 
   async function loadSession() {
@@ -55,7 +105,9 @@
       if (data.logged_in && data.profile) {
         document.getElementById("displayName").textContent = data.profile.display_name;
       }
-    } catch (_) { /* ignore */ }
+    } catch (_) {
+      /* ignore */
+    }
   }
 
   function showFaceBox(box) {
@@ -92,15 +144,18 @@
       fusion.fused_emotion_ko ||
       visual.emotion_ko ||
       EMOTION_KO[fusion.fused_emotion];
-    setStatus(`표정 분석: ${label} (챗봇에 반영됨)`);
+    const em = EMOTION_EMOJI[fusion.fused_emotion] || "";
+    setStatus(`표정 분석: ${em} ${label} (챗봇에 반영됨)`);
   }
 
   async function runEmotionAnalyze(silent = false) {
     const btn = document.getElementById("analyzeBtn");
+    const syncBtn = document.getElementById("syncEmotionBtn");
     if (btn) {
       btn.disabled = true;
       btn.textContent = "분석 중…";
     }
+    if (syncBtn) syncBtn.disabled = true;
     if (!silent) setStatus("표정 분석 중…");
 
     const img = await CameraHelper.captureDataUrl();
@@ -112,6 +167,7 @@
         btn.disabled = false;
         btn.textContent = "표정 분석";
       }
+      if (syncBtn) syncBtn.disabled = false;
       return false;
     }
 
@@ -133,10 +189,12 @@
         btn.disabled = false;
         btn.textContent = "표정 분석";
       }
+      if (syncBtn) syncBtn.disabled = false;
     }
   }
 
   document.getElementById("analyzeBtn")?.addEventListener("click", () => runEmotionAnalyze(false));
+  document.getElementById("syncEmotionBtn")?.addEventListener("click", () => runEmotionAnalyze(false));
 
   document.getElementById("refaceBtn")?.addEventListener("click", async () => {
     setStatus("얼굴 재등록 중…");
@@ -157,38 +215,65 @@
     }
   });
 
-  function appendUserMessage(text) {
-    const box = document.getElementById("chatMessages");
-    const div = document.createElement("div");
-    div.className = "msg user";
-    div.innerHTML = `<p>${escapeHtml(text)}</p>`;
-    box.appendChild(div);
-    box.scrollTop = box.scrollHeight;
-  }
-
-  function appendBotMessage(text) {
-    const box = document.getElementById("chatMessages");
-    const div = document.createElement("div");
-    div.className = "msg bot";
-    div.innerHTML = `<p>${escapeHtml(text).replace(/\n/g, "<br>")}</p>`;
-    box.appendChild(div);
-    box.scrollTop = box.scrollHeight;
-  }
-
   function escapeHtml(s) {
     const d = document.createElement("div");
     d.textContent = s;
     return d.innerHTML;
   }
 
-  document.getElementById("chatForm")?.addEventListener("submit", async (e) => {
+  function appendUserMessage(text) {
+    const box = document.getElementById("chatMessages");
+    const div = document.createElement("div");
+    div.className = "msg user";
+    div.innerHTML = `<div class="msg-body"><p>${escapeHtml(text)}</p></div>`;
+    box.appendChild(div);
+    scrollChatToBottom();
+  }
+
+  function appendBotMessage(text, meta = {}) {
+    const box = document.getElementById("chatMessages");
+    const avatar = meta.bot_avatar || BOT_AVATAR;
+    const div = document.createElement("div");
+    div.className = "msg bot";
+    div.innerHTML = `
+      <span class="msg-avatar" aria-hidden="true">${escapeHtml(avatar)}</span>
+      <div class="msg-body"><p>${escapeHtml(text).replace(/\n/g, "<br>")}</p></div>
+    `;
+    box.appendChild(div);
+    scrollChatToBottom();
+  }
+
+  function resizeChatInput() {
+    const input = document.getElementById("chatInput");
+    if (!input) return;
+    input.style.height = "auto";
+    input.style.height = `${Math.min(input.scrollHeight, 120)}px`;
+  }
+
+  const chatForm = document.getElementById("chatForm");
+  const chatInput = document.getElementById("chatInput");
+
+  chatInput?.addEventListener("input", resizeChatInput);
+
+  chatInput?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      chatForm?.requestSubmit();
+    }
+  });
+
+  chatForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const input = document.getElementById("chatInput");
+    const sendBtn = document.getElementById("chatSendBtn");
     const text = input.value.trim();
     if (!text) return;
 
     appendUserMessage(text);
     input.value = "";
+    resizeChatInput();
+    if (sendBtn) sendBtn.disabled = true;
+    showTyping(true);
 
     if (Date.now() - lastAnalyzeAt > 45000) {
       await runEmotionAnalyze(true);
@@ -200,13 +285,24 @@
         fused_emotion: lastFusion.fused_emotion,
         situation: lastFusion.situation,
       });
+      showTyping(false);
       if (data.success) {
-        appendBotMessage(data.reply);
+        appendBotMessage(data.reply, {
+          bot_avatar: data.bot_avatar,
+          emotion_emoji: data.emotion_emoji,
+        });
+        if (data.emotion_ko) {
+          updateChatEmotionBadge(data.emotion, data.emotion_ko);
+        }
       } else {
         appendBotMessage(data.error || "응답을 생성하지 못했습니다.");
       }
     } catch (err) {
+      showTyping(false);
       appendBotMessage(err.message || "챗봇 서버에 연결할 수 없습니다.");
+    } finally {
+      if (sendBtn) sendBtn.disabled = false;
+      input.focus();
     }
   });
 
@@ -218,6 +314,7 @@
   document.addEventListener("DOMContentLoaded", async () => {
     hideLiveChip();
     setStatus("");
+    updateChatEmotionBadge("neutral", "평온");
     await CameraHelper.init("dashVideo", "dashCanvas");
     CameraHelper.bindGalleryButton(
       "galleryAnalyzeBtn",
@@ -226,5 +323,7 @@
       "dashStatus"
     );
     await loadSession();
+    resizeChatInput();
+    scrollChatToBottom();
   });
 })();

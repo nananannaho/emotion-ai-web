@@ -16,6 +16,8 @@ import random
 import re
 from dataclasses import dataclass, field
 
+from config import CHATBOT_AVATAR, EMOTION_EMOJI
+
 
 @dataclass
 class ResponseCandidate:
@@ -29,30 +31,30 @@ class ResponseCandidate:
 class LocalChatEngine:
     EMOTION_LEADS: dict[str, list[str]] = {
         "happy": [
-            "표정에서 기쁨이 많이 느껴져요.",
-            "지금 얼굴 표정이 밝아 보여요.",
+            "😊 표정에서 기쁨이 많이 느껴져요.",
+            "지금 얼굴 표정이 밝아 보여요 ✨",
         ],
         "sad": [
-            "지금 표정이 조금 무거워 보여요.",
+            "😢 지금 표정이 조금 무거워 보여요.",
             "표정에서 슬픔이 느껴져요. 괜찮아요, 천천히 말해 주세요.",
         ],
         "angry": [
-            "표정에서 화가 난 기분이 조금 보여요.",
-            "지금 많이 답답하신 것 같아요.",
+            "😤 표정에서 화가 난 기분이 조금 보여요.",
+            "지금 많이 답답하신 것 같아요. 말로 풀어도 괜찮아요.",
         ],
         "fear": [
-            "표정이 조금 긴장된 것 같아요.",
-            "불안해 보이는 표정이에요. 함께 정리해 봐요.",
+            "😰 표정이 조금 긴장된 것 같아요.",
+            "불안해 보이는 표정이에요. 함께 차근차근 정리해 봐요.",
         ],
         "surprise": [
-            "놀란 표정이 보여요!",
+            "😲 놀란 표정이 보여요!",
             "표정이 조금 놀라신 것 같아요.",
         ],
         "neutral": [
-            "지금은 비교적 차분한 표정이에요.",
+            "😌 지금은 비교적 차분한 표정이에요.",
         ],
         "disgust": [
-            "표정이 조금 불편해 보이는 것 같아요.",
+            "😣 표정이 조금 불편해 보이는 것 같아요.",
         ],
     }
 
@@ -192,6 +194,33 @@ class LocalChatEngine:
     def _normalize(self, text: str) -> str:
         return re.sub(r"\s+", " ", text.strip().lower())
 
+    @staticmethod
+    def emotion_emoji(emotion: str) -> str:
+        return EMOTION_EMOJI.get(emotion, "💬")
+
+    def _apply_emotion_emoji(self, text: str, fused_emotion: str) -> str:
+        """답변 앞에 감정 이모티콘 1개 — 과하지 않게 자연스럽게."""
+        em = self.emotion_emoji(fused_emotion)
+        if not em or em in text:
+            return text
+        return f"{em} {text.lstrip()}"
+
+    def _emotion_closing(self, fused_emotion: str) -> str:
+        """가끔 끝에 붙이는 부드러운 마무리 이모티콘."""
+        closings = {
+            "happy": (" ✨", " 🌿"),
+            "sad": (" 🫂", ""),
+            "angry": ("", ""),
+            "fear": (" 🌿", ""),
+            "surprise": (" ✨", ""),
+            "neutral": ("", ""),
+            "disgust": ("", ""),
+        }
+        opts = [c for c in closings.get(fused_emotion, ("",)) if c]
+        if not opts or random.random() > 0.35:
+            return ""
+        return random.choice(opts)
+
     def detect_intents(self, message: str) -> list[str]:
         msg = self._normalize(message)
         found = []
@@ -290,6 +319,9 @@ class LocalChatEngine:
             elif user_message.strip() and "general" not in (best.intents[:1] or []):
                 text = f"{prefix}{text}"
 
+        text = self._apply_emotion_emoji(text, fused_emotion)
+        text = text.rstrip() + self._emotion_closing(fused_emotion)
+
         detected = ", ".join(intents[:3])
         return text, detected
 
@@ -321,6 +353,8 @@ class LocalChatEngine:
             "reply": reply,
             "emotion": fused_emotion,
             "emotion_ko": emotion_ko,
+            "emotion_emoji": self.emotion_emoji(fused_emotion),
+            "bot_avatar": CHATBOT_AVATAR,
             "situation": situation,
             "engine": "local",
             "detected_intent": intent,
