@@ -1,12 +1,14 @@
 """
-7가지 표정 분류기 학습 (scikit-learn) — Render 경량 배포용.
+7가지 표정 분류기 학습 — FER2013 실제 얼굴 + (선택) 직접 촬영 사진.
 
-로컬에서 1회 실행:
-  python scripts/train_emotion_classifier.py
+1) FER2013 받기:  python scripts/download_fer2013.py
+2) 학습 실행:    python scripts/train_emotion_classifier.py
+3) 배포:         git push 후 Render Manual Deploy
 """
 
 from __future__ import annotations
 
+import csv
 import sys
 from pathlib import Path
 
@@ -19,85 +21,169 @@ sys.path.insert(0, str(ROOT))
 from config import EMOTION_LABELS, WEIGHTS_DIR  # noqa: E402
 from models.emotion_features import extract_face_features  # noqa: E402
 
+FER_CSV = ROOT / "data" / "fer2013" / "fer2013.csv"
+CUSTOM_DIR = ROOT / "data" / "emotions"
 OUT_PATH = WEIGHTS_DIR / "emotion_clf.joblib"
 
-
-def _draw_base(rng: np.random.Generator) -> np.ndarray:
-    img = np.full((48, 48), rng.integers(70, 130), dtype=np.uint8)
-    cv2.ellipse(img, (24, 26), (16, 20), 0, 0, 360, int(rng.integers(140, 200)), -1)
-    cv2.circle(img, (16, 20), 3, 40, -1)
-    cv2.circle(img, (32, 20), 3, 40, -1)
-    return img
+# FER2013 emotion id → 우리 라벨 (동일 순서)
+FER_ID_TO_LABEL = list(EMOTION_LABELS)
 
 
-def _synthesize(emotion: str, rng: np.random.Generator) -> np.ndarray:
-    img = _draw_base(rng)
-    noise = rng.normal(0, 6, img.shape).astype(np.int16)
-    img = np.clip(img.astype(np.int16) + noise, 0, 255).astype(np.uint8)
-
-    if emotion == "happy":
-        cv2.ellipse(img, (24, 32), (10, 5), 0, 0, 180, 220, 2)
-        img = cv2.add(img, 25)
-    elif emotion == "sad":
-        cv2.ellipse(img, (24, 34), (8, 4), 0, 0, 180, 60, 2)
-        img = cv2.subtract(img, 20)
-    elif emotion == "angry":
-        cv2.line(img, (14, 17), (18, 19), 30, 2)
-        cv2.line(img, (34, 17), (30, 19), 30, 2)
-        img = cv2.convertScaleAbs(img, alpha=1.2, beta=-15)
-    elif emotion == "surprise":
-        cv2.circle(img, (24, 30), 5, 200, 2)
-        cv2.circle(img, (16, 18), 4, 180, -1)
-        cv2.circle(img, (32, 18), 4, 180, -1)
-    elif emotion == "fear":
-        img = cv2.subtract(img, 15)
-        cv2.ellipse(img, (24, 32), (8, 4), 0, 0, 180, 100, 2)
-    elif emotion == "disgust":
-        cv2.line(img, (20, 30), (28, 32), 80, 2)
-        img[:, :24] = cv2.subtract(img[:, :24], 10)
-    # neutral: base only
-
-    blur = rng.integers(0, 2)
-    if blur:
+def _augment(face: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    img = face.copy()
+    if rng.random() < 0.5:
+        img = cv2.flip(img, 1)
+    alpha = rng.uniform(0.85, 1.15)
+    beta = rng.integers(-15, 16)
+    img = cv2.convertScaleAbs(img, alpha=alpha, beta=beta)
+    if rng.random() < 0.3:
         img = cv2.GaussianBlur(img, (3, 3), 0)
     return img
 
 
-def build_dataset(samples_per_class: int = 400) -> tuple[np.ndarray, np.ndarray]:
+def _load_fer2013(
+    max_per_class: int = 4000,
+    usage: str = "Training",
+) -> tuple[list[np.ndarray], list[int]]:
+    if not FER_CSV.exists():
+        return [], []
+
+    xs: list[np.ndarray] = []
+    ys: list[int] = []
+    counts = {i: 0 for i in range(7)}
+
+    print(f"FER2013 로드: {FER_CSV}")
+    with FER_CSV.open(encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            use = (row.get("Usage") or row.get(" usage") or "").strip()
+            if use and use != usage:
+                continue
+            emo_id = int(row["emotion"])
+            if emo_id < 0 or emo_id > 6 or counts[emo_id] >= max_per_class:
+                continue
+            pixels = np.asarray(row["pixels"].split(), dtype=np.uint8)
+            if pixels.size != 48 * 48:
+                continue
+            face = pixels.reshape(48, 48)
+            xs.append(face)
+            ys.append(emo_id)
+            counts[emo_id] += 1
+
+    print(f"  FER2013 샘플: {len(ys)} (클래스별 {counts})")
+    return xs, ys
+
+
+def _load_custom_folders() -> tuple[list[np.ndarray], list[int]]:
+    if not CUSTOM_DIR.exists():
+        return [], []
+
+    faces: list[np.ndarray] = []
+    labels: list[int] = []
+    label_map = {name: i for i, name in enumerate(EMOTION_LABELS)}
+
+    for emo_name, idx in label_map.items():
+        folder = CUSTOM_DIR / emo_name
+        if not folder.is_dir():
+            continue
+        for path in list(folder.glob("*.jpg")) + list(folder.glob("*.png")) + list(folder.glob("*.jpeg")):
+            img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+            if img is None:
+                continue
+            face = cv2.resize(img, (48, 48))
+            faces.append(face)
+            labels.append(idx)
+
+    if faces:
+        print(f"  직접 촬영 사진: {len(faces)}장 ({CUSTOM_DIR})")
+    return faces, labels
+
+
+def _build_feature_matrix(
+    faces: list[np.ndarray],
+    labels: list[int],
+    augment_times: int = 1,
+) -> tuple[np.ndarray, np.ndarray]:
     rng = np.random.default_rng(42)
-    xs, ys = [], []
-    for label_idx, emo in enumerate(EMOTION_LABELS):
-        for _ in range(samples_per_class):
-            face = _synthesize(emo, rng)
-            xs.append(extract_face_features(face))
-            ys.append(label_idx)
-    return np.vstack(xs), np.array(ys, dtype=np.int32)
+    feats, ys = [], []
+
+    for face, label in zip(faces, labels):
+        feats.append(extract_face_features(face))
+        ys.append(label)
+        for _ in range(augment_times):
+            aug = _augment(face, rng)
+            feats.append(extract_face_features(aug))
+            ys.append(label)
+
+    return np.vstack(feats), np.array(ys, dtype=np.int32)
 
 
 def main():
     from sklearn.ensemble import RandomForestClassifier
-    from sklearn.model_selection import cross_val_score
+    from sklearn.metrics import classification_report
+    from sklearn.model_selection import train_test_split
     import joblib
 
     WEIGHTS_DIR.mkdir(parents=True, exist_ok=True)
-    print("데이터 생성 중...")
-    X, y = build_dataset()
-    print(f"샘플: {len(y)}, 특징 차원: {X.shape[1]}")
 
+    fer_faces, fer_labels = _load_fer2013()
+    custom_faces, custom_labels = _load_custom_folders()
+
+    if not fer_faces and not custom_faces:
+        print("\n학습용 이미지가 없습니다.")
+        print("  python scripts/download_fer2013.py")
+        print("  또는 data/emotions/ 폴더에 사진 추가")
+        sys.exit(1)
+
+    all_faces = fer_faces + custom_faces
+    all_labels = fer_labels + custom_labels
+    print(f"\n총 얼굴 이미지: {len(all_labels)}장 → 특징 추출 중...")
+    X, y = _build_feature_matrix(all_faces, all_labels, augment_times=1)
+    print(f"학습 벡터: {X.shape[0]}개, 차원: {X.shape[1]}")
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.15, random_state=42, stratify=y
+    )
+
+    # GitHub 파일 100MB 제한 — 트리 수·깊이를 제한해 joblib 크기 유지
     clf = RandomForestClassifier(
         n_estimators=120,
         max_depth=18,
-        min_samples_leaf=2,
-        class_weight="balanced",
+        max_features="sqrt",
+        min_samples_leaf=3,
+        class_weight="balanced_subsample",
         random_state=42,
         n_jobs=-1,
     )
-    scores = cross_val_score(clf, X, y, cv=5)
-    print(f"교차 검증 정확도: {scores.mean():.3f} (+/- {scores.std():.3f})")
+    clf.fit(X_train, y_train)
+    y_pred = clf.predict(X_test)
+    print("\n검증 결과 (FER2013 기반):")
+    print(
+        classification_report(
+            y_test,
+            y_pred,
+            target_names=EMOTION_LABELS,
+            zero_division=0,
+        )
+    )
 
     clf.fit(X, y)
-    joblib.dump({"model": clf, "labels": EMOTION_LABELS}, OUT_PATH)
-    print(f"저장 완료: {OUT_PATH}")
+    joblib.dump(
+        {
+            "model": clf,
+            "labels": EMOTION_LABELS,
+            "source": "fer2013+custom",
+            "n_samples": int(len(y)),
+        },
+        OUT_PATH,
+        compress=3,
+    )
+    size_mb = OUT_PATH.stat().st_size / (1024 * 1024)
+    print(f"\n저장 완료: {OUT_PATH} ({size_mb:.1f} MB)")
+    if size_mb > 95:
+        print("경고: 파일이 95MB를 넘습니다. GitHub push가 거부될 수 있습니다.")
+        sys.exit(1)
+    print("다음: git add weights/emotion_clf.joblib && git push → Render 배포")
 
 
 if __name__ == "__main__":

@@ -19,6 +19,7 @@ class EmotionMLClassifier:
     def __init__(self):
         self._model = None
         self._labels = EMOTION_LABELS
+        self._source = ""
         self._load()
 
     def _load(self):
@@ -30,7 +31,8 @@ class EmotionMLClassifier:
             data = joblib.load(CLF_PATH)
             self._model = data["model"]
             self._labels = list(data.get("labels", EMOTION_LABELS))
-            logger.info("감정 ML 분류기 로드: %s", CLF_PATH)
+            self._source = str(data.get("source", ""))
+            logger.info("감정 ML 분류기 로드: %s (%s)", CLF_PATH, self._source or "unknown")
         except Exception as exc:
             logger.warning("감정 ML 로드 실패: %s", exc)
             self._model = None
@@ -38,6 +40,10 @@ class EmotionMLClassifier:
     @property
     def available(self) -> bool:
         return self._model is not None
+
+    @property
+    def fer_trained(self) -> bool:
+        return "fer2013" in self._source.lower()
 
     def predict_distribution(self, face_gray: np.ndarray) -> dict[str, float]:
         if not self._model:

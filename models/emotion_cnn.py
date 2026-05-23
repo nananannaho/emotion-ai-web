@@ -141,8 +141,9 @@ class EmotionCNN:
         elif self._ml.available:
             dist_ml = self._ml.predict_distribution(face_resized)
             dist_heur = self._heuristic_emotion(face_resized)
+            ml_w = 0.85 if self._ml.fer_trained else 0.75
             distribution = {
-                emo: 0.75 * dist_ml.get(emo, 0) + 0.25 * dist_heur.get(emo, 0)
+                emo: ml_w * dist_ml.get(emo, 0) + (1.0 - ml_w) * dist_heur.get(emo, 0)
                 for emo in EMOTION_LABELS
             }
             total = sum(distribution.values()) or 1.0
