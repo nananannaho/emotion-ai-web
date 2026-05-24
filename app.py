@@ -66,7 +66,7 @@ def health():
         "emotion_ml": (WEIGHTS_DIR / "emotion_clf.joblib").exists(),
         "database": db.backend,
         "database_url_set": bool(DATABASE_URL),
-        "api_version": 7,
+        "api_version": 8,
     })
 
 
@@ -231,6 +231,22 @@ def api_session():
 def api_logout():
     session.clear()
     return jsonify({"success": True})
+
+
+@app.post("/api/account/delete")
+def api_delete_account():
+    if not session.get("user"):
+        return jsonify({"success": False, "error": "로그인이 필요합니다."}), 401
+
+    data = request.get_json(silent=True) or {}
+    password = data.get("password") or ""
+    username = session["user"]
+
+    result = auth_service.delete_account(username, password)
+    if result.get("success"):
+        session.clear()
+    status = 200 if result.get("success") else 400
+    return jsonify(result), status
 
 
 @app.post("/api/face/update")

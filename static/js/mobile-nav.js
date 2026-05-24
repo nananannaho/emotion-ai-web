@@ -9,6 +9,15 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   links.querySelectorAll("a").forEach((a) => {
-    a.addEventListener("click", () => links.classList.remove("open"));
+    a.addEventListener("click", () => {
+      links.classList.remove("open");
+      toggle.setAttribute("aria-expanded", "false");
+    });
+  });
+
+  const guideBtn = document.getElementById("openGuideBtn");
+  guideBtn?.addEventListener("click", () => {
+    links.classList.remove("open");
+    toggle.setAttribute("aria-expanded", "false");
   });
 });

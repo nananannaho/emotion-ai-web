@@ -186,10 +186,23 @@ class Database:
                 """
             )
 
+    def delete_user(self, username: str) -> bool:
+        u = _safe_username(username)
+        if not u:
+            return False
+        if self._postgres:
+            self._pg_run("DELETE FROM users WHERE username = %s", (u,))
+        else:
+            with self._sqlite() as conn:
+                conn.execute("DELETE FROM face_embeddings WHERE username = ?", (u,))
+                conn.execute("DELETE FROM users WHERE username = ?", (u,))
+        return True
+
     @contextmanager
     def _sqlite(self):
         conn = sqlite3.connect(DB_PATH, check_same_thread=False)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
         try:
             yield conn
             conn.commit()

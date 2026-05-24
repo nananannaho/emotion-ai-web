@@ -74,6 +74,25 @@
       </form>
     </section>
   </div>
+
+  <section class="account-settings glass">
+    <h3>계정</h3>
+    <p class="account-settings-desc">
+      서비스를 그만두시려면 비밀번호를 입력한 뒤 계정을 삭제할 수 있습니다. 얼굴·대화 기록이 모두 제거됩니다.
+    </p>
+    <label class="account-delete-label" for="deleteAccountPassword">비밀번호 확인</label>
+    <input
+      type="password"
+      id="deleteAccountPassword"
+      class="account-delete-input"
+      autocomplete="current-password"
+      placeholder="비밀번호"
+    >
+    <button type="button" id="deleteAccountBtn" class="btn btn-ghost btn-danger touch-btn">
+      계정 탈퇴
+    </button>
+    <p id="deleteAccountError" class="error-text" hidden></p>
+  </section>
 </section>
 {% endblock %}
 

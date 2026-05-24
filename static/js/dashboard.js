@@ -311,6 +311,46 @@
     window.location.href = "/";
   });
 
+  document.getElementById("deleteAccountBtn")?.addEventListener("click", async () => {
+    const pwInput = document.getElementById("deleteAccountPassword");
+    const errEl = document.getElementById("deleteAccountError");
+    const btn = document.getElementById("deleteAccountBtn");
+    const password = pwInput?.value || "";
+
+    if (errEl) {
+      errEl.hidden = true;
+      errEl.textContent = "";
+    }
+
+    if (
+      !window.confirm(
+        "정말 계정을 삭제할까요?\n얼굴 데이터와 대화 기록이 모두 삭제되며 되돌릴 수 없습니다."
+      )
+    ) {
+      return;
+    }
+
+    if (btn) btn.disabled = true;
+    try {
+      const data = await postJson("/api/account/delete", { password });
+      if (data.success) {
+        window.location.href = "/";
+        return;
+      }
+      if (errEl) {
+        errEl.hidden = false;
+        errEl.textContent = data.error || "계정 삭제에 실패했습니다.";
+      }
+    } catch (err) {
+      if (errEl) {
+        errEl.hidden = false;
+        errEl.textContent = err.message || "서버 연결에 실패했습니다.";
+      }
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  });
+
   document.addEventListener("DOMContentLoaded", async () => {
     hideLiveChip();
     setStatus("");
