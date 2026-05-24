@@ -44,8 +44,16 @@ def _embedding_to_bytes(embedding: np.ndarray) -> bytes:
     return embedding.astype(np.float32).tobytes()
 
 
-def _bytes_to_embedding(data: bytes) -> np.ndarray:
-    return np.frombuffer(data, dtype=np.float32)
+def _bytes_to_embedding(data: bytes) -> np.ndarray | None:
+    if not data:
+        return None
+    raw = bytes(data) if not isinstance(data, (bytes, bytearray)) else data
+    if len(raw) % 4 != 0:
+        return None
+    arr = np.frombuffer(raw, dtype=np.float32)
+    if arr.size == 0 or not np.isfinite(arr).all():
+        return None
+    return arr.copy()
 
 
 class Database:
@@ -400,7 +408,9 @@ class Database:
                 with self._pg_cursor() as cur:
                     cur.execute("SELECT username, embedding FROM face_embeddings")
                     for username, blob in cur.fetchall():
-                        result[username] = _bytes_to_embedding(bytes(blob))
+                        emb = _bytes_to_embedding(blob)
+                        if emb is not None:
+                            result[username] = emb
             except Exception as exc:
                 logger.error("get_all_embeddings 오류: %s", exc)
                 self._pg_rollback()
@@ -410,7 +420,9 @@ class Database:
         with self._sqlite() as conn:
             rows = conn.execute("SELECT username, embedding FROM face_embeddings").fetchall()
             for row in rows:
-                result[row["username"]] = _bytes_to_embedding(row["embedding"])
+                emb = _bytes_to_embedding(row["embedding"])
+                if emb is not None:
+                    result[row["username"]] = emb
         return result
 
     def update_mood_history(self, username: str, emotion: str, limit: int = 20):

@@ -101,12 +101,37 @@ class AuthService:
 
         try:
             user, score = self.encoder.match_user(face_image_bgr, embeddings)
+        except ValueError as exc:
+            if str(exc) == "stored_embeddings_incompatible":
+                return {
+                    "success": False,
+                    "error": (
+                        "저장된 얼굴 데이터 형식이 맞지 않습니다. "
+                        "비밀번호로 로그인한 뒤 대시보드에서 「얼굴 재등록」을 해 주세요."
+                    ),
+                }
+            logger.exception("얼굴 매칭 값 오류: %s", exc)
+            return {
+                "success": False,
+                "error": "얼굴 인식 처리 중 오류가 발생했습니다. 사진을 다시 선택해 주세요.",
+            }
         except Exception as exc:
             logger.exception("얼굴 매칭 오류: %s", exc)
             return {
                 "success": False,
                 "error": "얼굴 인식 처리 중 오류가 발생했습니다. 사진을 다시 선택해 주세요.",
             }
+
+        if user is None and score <= 0.0:
+            probe = self.encoder.encode(face_image_bgr, allow_center_fallback=True)
+            if probe is None:
+                return {
+                    "success": False,
+                    "error": (
+                        "사진에서 얼굴을 찾지 못했습니다. "
+                        "가입할 때와 같이 정면·밝은 곳에서 다시 촬영하거나 「사진 촬영/선택」을 이용해 주세요."
+                    ),
+                }
 
         if user is None:
             hint = (
