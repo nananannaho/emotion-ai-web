@@ -665,6 +665,8 @@ body {
   border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--bg-card);
+  position: relative;
+  z-index: 1;
 }
 
 .dash-actions-row {
@@ -1178,6 +1180,23 @@ body {
   border-color: rgba(255, 255, 255, 0.2);
 }
 
+.nav-drawer-actions {
+  margin-bottom: 0.5rem;
+}
+
+.nav-drawer-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1rem 0;
+}
+
+.nav-drawer-section-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
 .account-delete-input--drawer {
   max-width: none;
   width: 100%;
@@ -1306,24 +1325,19 @@ body.nav-drawer-open {
     font-size: 1.35rem;
   }
 
-  .dash-header .btn {
-    width: 100%;
-    min-height: 44px;
-  }
-
   .dash-layout {
     grid-template-columns: 1fr;
-    gap: 0.75rem;
+    gap: 1rem;
   }
 
   .dash-camera-sticky {
-    position: sticky;
-    top: 0;
-    z-index: 30;
-    margin: 0 -0.25rem;
-    padding: 0.65rem;
-    backdrop-filter: blur(12px);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    position: relative;
+    top: auto;
+    z-index: 1;
+    margin: 0;
+    margin-bottom: 0.25rem;
+    padding: 0.75rem;
+    box-shadow: none;
   }
 
   .dash-camera video,
@@ -1339,24 +1353,29 @@ body.nav-drawer-open {
   }
 
   .dashboard {
-    display: flex;
-    flex-direction: column;
+    display: block;
+  }
+
+  .dash-header {
+    margin-bottom: 1rem;
   }
 
   .chat-panel {
     min-height: 0;
+    position: relative;
+    z-index: 2;
+    margin-top: 0;
   }
 
   .chat-scroll-wrap {
-    min-height: 180px;
-    max-height: min(42vh, 360px);
+    min-height: 200px;
+    max-height: min(48vh, 400px);
   }
 
   .chat-form {
-    position: sticky;
-    bottom: 0;
+    position: relative;
     padding-bottom: env(safe-area-inset-bottom, 0);
-    background: linear-gradient(180deg, transparent, rgba(11, 20, 36, 0.92) 28%);
+    background: transparent;
   }
 
   .chat-form-actions {

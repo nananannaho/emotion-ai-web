@@ -21,9 +21,16 @@
   <div class="nav-drawer-backdrop" data-nav-close tabindex="-1" aria-hidden="true"></div>
   <aside class="nav-drawer-panel" role="dialog" aria-modal="true" aria-labelledby="navDrawerTitle" tabindex="-1">
     <header class="nav-drawer-header">
-      <h2 id="navDrawerTitle">계정</h2>
+      <h2 id="navDrawerTitle">메뉴</h2>
       <button type="button" class="nav-drawer-close" data-nav-close aria-label="닫기">×</button>
     </header>
+    <div class="nav-drawer-actions">
+      <button type="button" id="logoutBtn" class="btn btn-ghost touch-btn btn-block">
+        로그아웃
+      </button>
+    </div>
+    <hr class="nav-drawer-divider">
+    <h3 class="nav-drawer-section-title">계정 탈퇴</h3>
     <p class="account-settings-desc">
       서비스를 그만두시려면 비밀번호를 입력한 뒤 계정을 삭제할 수 있습니다. 얼굴·대화 기록이 모두 제거됩니다.
     </p>
@@ -50,7 +57,6 @@
       <h2>안녕하세요, <span id="displayName">{{ user }}</span>님</h2>
       <p class="dash-sub">표정을 분석한 뒤 채팅하면 감정에 맞는 답변을 받을 수 있어요.</p>
     </div>
-    <button type="button" id="logoutBtn" class="btn btn-ghost">로그아웃</button>
   </header>
 
   <div class="dash-layout">
