@@ -91,10 +91,40 @@
     if (chip) chip.hidden = true;
   }
 
+  function getChatBox() {
+    return document.getElementById("chatMessages");
+  }
+
+  function getTypingEl() {
+    return document.getElementById("chatTyping");
+  }
+
+  /** 타이핑(...)은 항상 대화 맨 아래(최신 메시지 다음)에 위치 */
+  function ensureTypingAtBottom() {
+    const box = getChatBox();
+    const typing = getTypingEl();
+    if (box && typing && typing.parentElement === box) {
+      box.appendChild(typing);
+    }
+  }
+
+  function insertChatMessage(node) {
+    const box = getChatBox();
+    const typing = getTypingEl();
+    if (!box) return;
+    if (typing && typing.parentElement === box) {
+      box.insertBefore(node, typing);
+    } else {
+      box.appendChild(node);
+    }
+  }
+
   function showTyping(show) {
-    const el = document.getElementById("chatTyping");
+    const el = getTypingEl();
     if (!el) return;
+    ensureTypingAtBottom();
     el.hidden = !show;
+    el.setAttribute("aria-hidden", show ? "false" : "true");
     if (show) scrollChatToBottom();
   }
 
@@ -222,16 +252,14 @@
   }
 
   function appendUserMessage(text) {
-    const box = document.getElementById("chatMessages");
     const div = document.createElement("div");
     div.className = "msg user";
     div.innerHTML = `<div class="msg-body"><p>${escapeHtml(text)}</p></div>`;
-    box.appendChild(div);
+    insertChatMessage(div);
     scrollChatToBottom();
   }
 
   function appendBotMessage(text, meta = {}) {
-    const box = document.getElementById("chatMessages");
     const avatar = meta.bot_avatar || BOT_AVATAR;
     const div = document.createElement("div");
     div.className = "msg bot";
@@ -239,7 +267,7 @@
       <span class="msg-avatar" aria-hidden="true">${escapeHtml(avatar)}</span>
       <div class="msg-body"><p>${escapeHtml(text).replace(/\n/g, "<br>")}</p></div>
     `;
-    box.appendChild(div);
+    insertChatMessage(div);
     scrollChatToBottom();
   }
 

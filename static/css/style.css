@@ -892,6 +892,13 @@ body {
   scroll-behavior: smooth;
 }
 
+/* 메시지가 적을 때도 맨 아래(입력창 쪽)부터 쌓이도록 */
+.chat-messages::before {
+  content: "";
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .msg {
   display: flex;
   gap: 0.5rem;
@@ -949,7 +956,8 @@ body {
 }
 
 .chat-typing {
-  margin-top: 0.15rem;
+  flex-shrink: 0;
+  order: 9999;
 }
 
 .chat-typing[hidden] {
