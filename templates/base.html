@@ -35,6 +35,7 @@
     <div class="nav-links">
       <a href="/">홈</a>
       <a href="/login">로그인</a>
+      <button type="button" id="openGuideBtn" class="nav-guide-btn">이용 방법</button>
       <a href="/register" class="btn-nav">시작하기</a>
     </div>
   </nav>
@@ -47,7 +48,47 @@
     <p>EmotionAI · 표정 기반 감정 맞춤 챗봇</p>
   </footer>
 
+  <div id="guideModal" class="guide-modal" hidden aria-hidden="true">
+    <div class="guide-modal-backdrop" data-guide-close aria-hidden="true"></div>
+    <div
+      class="guide-modal-panel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="guideTitle"
+      tabindex="-1"
+    >
+      <button type="button" class="guide-modal-close" data-guide-close aria-label="닫기">×</button>
+      <h2 id="guideTitle">이용 방법</h2>
+      <ol class="guide-steps">
+        <li>
+          <span class="guide-step-num">1</span>
+          <div>
+            <strong>회원가입 · 얼굴 등록</strong>
+            <p>가입 시 정면 얼굴을 등록해 주세요. 이후 얼굴로 로그인할 수 있습니다.</p>
+          </div>
+        </li>
+        <li>
+          <span class="guide-step-num">2</span>
+          <div>
+            <strong>표정 분석</strong>
+            <p>대시보드에서 <em>표정 분석</em> 또는 <em>표정 반영</em>을 눌러 현재 표정을 읽습니다.</p>
+          </div>
+        </li>
+        <li>
+          <span class="guide-step-num">3</span>
+          <div>
+            <strong>챗봇 대화</strong>
+            <p>메시지를 내면 분석된 감정에 맞는 이모티콘과 답변을 받을 수 있습니다.</p>
+          </div>
+        </li>
+      </ol>
+      <p class="guide-tip">카메라가 안 되면 <strong>사진</strong> 버튼으로 얼굴 사진을 선택해 주세요.</p>
+      <button type="button" class="btn btn-primary btn-block touch-btn" data-guide-close>확인</button>
+    </div>
+  </div>
+
   <script src="{{ url_for('static', filename='js/api.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/guide-modal.js') }}"></script>
   <script src="{{ url_for('static', filename='js/mobile-nav.js') }}" defer></script>
   {% block scripts %}{% endblock %}
 </body>
