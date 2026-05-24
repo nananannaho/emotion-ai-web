@@ -49,6 +49,7 @@ def inject_globals():
     return {
         "is_cloud": IS_CLOUD,
         "use_light_ml": USE_LIGHT_ML,
+        "logged_in": bool(session.get("user")),
     }
 
 
@@ -66,7 +67,7 @@ def health():
         "emotion_ml": (WEIGHTS_DIR / "emotion_clf.joblib").exists(),
         "database": db.backend,
         "database_url_set": bool(DATABASE_URL),
-        "api_version": 8,
+        "api_version": 9,
     })
 
 
@@ -89,7 +90,7 @@ def login_page():
 def dashboard():
     if not session.get("user"):
         return render_template("login.html", error="로그인이 필요합니다.")
-    return render_template("dashboard.html", user=session["user"])
+    return render_template("dashboard.html", user=session["user"], app_nav=True)
 
 
 @app.post("/api/register")
