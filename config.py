@@ -19,11 +19,16 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "emotion-ai-club-dev-key-change-in-pro
 MAX_CONTENT_LENGTH = 8 * 1024 * 1024
 ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "felunai").strip()
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "felunai@@1.").strip()
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
+RESEND_API_BASE = os.environ.get("RESEND_API_BASE", "https://api.resend.com").strip().rstrip("/")
 SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com").strip()
 SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
 SMTP_USERNAME = os.environ.get("SMTP_USERNAME", "").strip()
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "").strip()
-MAIL_FROM = os.environ.get("MAIL_FROM", SMTP_USERNAME).strip()
+MAIL_FROM = os.environ.get(
+    "MAIL_FROM",
+    SMTP_USERNAME or "Felunai <onboarding@resend.dev>",
+).strip()
 EMAIL_VERIFICATION_TTL_MINUTES = int(os.environ.get("EMAIL_VERIFICATION_TTL_MINUTES", "10"))
 PASSWORD_RESET_TTL_MINUTES = int(os.environ.get("PASSWORD_RESET_TTL_MINUTES", "45"))
 
