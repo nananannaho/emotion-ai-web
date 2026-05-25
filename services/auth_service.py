@@ -112,7 +112,7 @@ class AuthService:
         return {"success": True, "username": username}
 
     def login_password(self, username: str, password: str) -> dict:
-        if username == ADMIN_USERNAME and password in {ADMIN_PASSWORD, f"{ADMIN_PASSWORD}."}:
+        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
             return {
                 "success": True,
                 "is_admin": True,
