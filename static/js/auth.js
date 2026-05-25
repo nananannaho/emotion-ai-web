@@ -15,7 +15,7 @@ const AuthHelper = (() => {
       }
     }
     if (!SPECIAL_PW.test(password)) {
-      return '비밀번호에 특수문자를 포함해 주세요 (*, &, " 제외).';
+      return '비밀번호에 특수문자를 1개 이상 포함해 주세요 (*, &, " 제외).';
     }
     return null;
   }

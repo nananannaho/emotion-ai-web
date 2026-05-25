@@ -17,8 +17,8 @@ for directory in (DATA_DIR, WEIGHTS_DIR, LEGACY_USERS_DIR, LEGACY_FACES_DIR):
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "emotion-ai-club-dev-key-change-in-production")
 MAX_CONTENT_LENGTH = 8 * 1024 * 1024
-ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "secret").strip()
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "qkrwlgns@@1.").strip()
+ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "felunai").strip()
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "felunai@@1.").strip()
 SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com").strip()
 SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
 SMTP_USERNAME = os.environ.get("SMTP_USERNAME", "").strip()

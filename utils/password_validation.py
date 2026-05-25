@@ -15,5 +15,5 @@ def validate_password(password: str) -> str | None:
     if any(c in FORBIDDEN_CHARS for c in password):
         return '비밀번호에 *, &, " 문자는 사용할 수 없습니다.'
     if not SPECIAL_RE.search(password):
-        return '비밀번호에 특수문자를 포함해 주세요 (*, &, " 제외).'
+        return '비밀번호에 특수문자를 1개 이상 포함해 주세요 (*, &, " 제외).'
     return None

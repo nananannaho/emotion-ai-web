@@ -21,7 +21,7 @@
       </label>
       <label>
         <span>비밀번호</span>
-        <input type="password" name="password" required minlength="8" autocomplete="new-password" placeholder="8자 이상, 특수문자 포함 (* & &quot; 제외)">
+        <input type="password" name="password" required minlength="8" autocomplete="new-password" placeholder="8자 이상, 특수문자 1개 이상 포함 (* & &quot; 제외)">
       </label>
 
       <div class="camera-block">
@@ -47,7 +47,7 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/api.js') }}"></script>
 <script src="{{ url_for('static', filename='js/camera.js') }}"></script>
-<script src="{{ url_for('static', filename='js/auth.js') }}?v=14"></script>
+<script src="{{ url_for('static', filename='js/auth.js') }}?v=15"></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     CameraHelper.init('registerVideo', 'registerCanvas');
