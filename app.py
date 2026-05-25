@@ -356,6 +356,17 @@ def api_password_reset_confirm():
     return jsonify(result), status
 
 
+@app.post("/api/password-reset/verify-code")
+def api_password_reset_verify_code():
+    data = request.get_json(silent=True) or {}
+    result = auth_service.verify_password_reset_code(
+        email=data.get("email") or "",
+        code=data.get("code") or "",
+    )
+    status = 200 if result.get("success") else 400
+    return jsonify(result), status
+
+
 @app.post("/api/password-reset/confirm-code")
 def api_password_reset_confirm_code():
     data = request.get_json(silent=True) or {}
