@@ -166,7 +166,9 @@ class AuthService:
 
         selector = secrets.token_urlsafe(12)
         verifier = secrets.token_urlsafe(32)
+        reset_code = f"{secrets.randbelow(1000000):06d}"
         token_hash = hashlib.sha256(verifier.encode("utf-8")).hexdigest()
+        code_hash = hashlib.sha256(reset_code.encode("utf-8")).hexdigest()
         expires_at = (
             datetime.now(timezone.utc) + timedelta(minutes=PASSWORD_RESET_TTL_MINUTES)
         ).isoformat()
@@ -174,6 +176,7 @@ class AuthService:
             username=profile["username"],
             selector=selector,
             token_hash=token_hash,
+            code_hash=code_hash,
             expires_at=expires_at,
         )
         return {
@@ -184,6 +187,7 @@ class AuthService:
             "email": email,
             "selector": selector,
             "token": verifier,
+            "reset_code": reset_code,
             "expires_at": expires_at,
         }
 
@@ -212,6 +216,38 @@ class AuthService:
             return {"success": False, "error": "사용자를 찾을 수 없습니다."}
         return {"success": True, "username": profile["username"], "email": profile.get("email", "")}
 
+    def verify_password_reset_code(self, email: str, code: str) -> dict:
+        email = self.normalize_email(email)
+        code = (code or "").strip()
+        if not self.is_valid_email(email):
+            return {"success": False, "error": "올바른 이메일 주소를 입력해 주세요."}
+        if not code:
+            return {"success": False, "error": "이메일 인증번호를 입력해 주세요."}
+
+        profile = self.db.get_user_by_email(email)
+        if not profile or profile["username"] == ADMIN_USERNAME:
+            return {"success": False, "error": "이메일 인증번호가 올바르지 않습니다."}
+
+        record = self.db.get_latest_password_reset_token_for_user(profile["username"])
+        if not record:
+            return {"success": False, "error": "재설정 요청을 먼저 진행해 주세요."}
+        if record.get("used_at"):
+            return {"success": False, "error": "이미 사용된 인증번호입니다. 새로 요청해 주세요."}
+
+        expires_at = datetime.fromisoformat(str(record["expires_at"]))
+        if expires_at < datetime.now(timezone.utc):
+            return {"success": False, "error": "인증번호가 만료되었습니다. 다시 요청해 주세요."}
+
+        code_hash = hashlib.sha256(code.encode("utf-8")).hexdigest()
+        if code_hash != record.get("code_hash"):
+            return {"success": False, "error": "이메일 인증번호가 올바르지 않습니다."}
+
+        return {
+            "success": True,
+            "username": profile["username"],
+            "selector": record["token_selector"],
+        }
+
     def reset_password(self, selector: str, token: str, new_password: str) -> dict:
         token_check = self.verify_password_reset_token(selector, token)
         if not token_check.get("success"):
@@ -224,6 +260,22 @@ class AuthService:
         username = token_check["username"]
         self.db.update_password_hash(username, generate_password_hash(new_password))
         self.db.mark_password_reset_token_used((selector or "").strip())
+        return {"success": True, "message": "비밀번호가 재설정되었습니다."}
+
+    def reset_password_with_code(self, email: str, code: str, new_password: str) -> dict:
+        code_check = self.verify_password_reset_code(email, code)
+        if not code_check.get("success"):
+            return code_check
+
+        pwd_err = validate_password(new_password)
+        if pwd_err:
+            return {"success": False, "error": pwd_err}
+
+        self.db.update_password_hash(
+            code_check["username"],
+            generate_password_hash(new_password),
+        )
+        self.db.mark_password_reset_token_used(code_check["selector"])
         return {"success": True, "message": "비밀번호가 재설정되었습니다."}
 
     def login_face(self, username: str, face_image_bgr) -> dict:
@@ -326,6 +378,22 @@ class AuthService:
 
     def get_admin_users(self, limit: int = 200) -> list[dict]:
         return self.db.list_users_summary(limit=limit)
+
+    def admin_delete_user(self, username: str) -> dict:
+        username = (username or "").strip()
+        if not username:
+            return {"success": False, "error": "삭제할 사용자 이름이 필요합니다."}
+        if username == ADMIN_USERNAME:
+            return {"success": False, "error": "관리자 계정은 삭제할 수 없습니다."}
+        profile = self.db.get_user_full(username)
+        if not profile:
+            return {"success": False, "error": "사용자를 찾을 수 없습니다."}
+        try:
+            self.db.delete_user(username)
+        except Exception as exc:
+            logger.exception("관리자 계정 삭제 실패 (%s): %s", username, exc)
+            return {"success": False, "error": "계정 삭제 중 오류가 발생했습니다."}
+        return {"success": True, "message": f"{username} 계정을 삭제했습니다."}
 
     def delete_account(self, username: str, password: str) -> dict:
         profile = self.db.get_user_full(username)

@@ -253,6 +253,7 @@ def api_password_reset_request():
                 to_email=result["email"],
                 display_name=result["display_name"],
                 reset_url=reset_url,
+                reset_code=result["reset_code"],
             )
     except Exception as exc:
         logger.exception("비밀번호 재설정 메일 발송 실패: %s", exc)
@@ -273,6 +274,18 @@ def api_password_reset_confirm():
     result = auth_service.reset_password(
         selector=data.get("selector") or "",
         token=data.get("token") or "",
+        new_password=data.get("password") or "",
+    )
+    status = 200 if result.get("success") else 400
+    return jsonify(result), status
+
+
+@app.post("/api/password-reset/confirm-code")
+def api_password_reset_confirm_code():
+    data = request.get_json(silent=True) or {}
+    result = auth_service.reset_password_with_code(
+        email=data.get("email") or "",
+        code=data.get("code") or "",
         new_password=data.get("password") or "",
     )
     status = 200 if result.get("success") else 400
@@ -355,6 +368,17 @@ def api_delete_account():
     result = auth_service.delete_account(username, password)
     if result.get("success"):
         session.clear()
+    status = 200 if result.get("success") else 400
+    return jsonify(result), status
+
+
+@app.post("/api/admin/users/delete")
+def api_admin_delete_user():
+    if not _is_admin_session():
+        return jsonify({"success": False, "error": "관리자 로그인이 필요합니다."}), 403
+
+    data = request.get_json(silent=True) or {}
+    result = auth_service.admin_delete_user(data.get("username") or "")
     status = 200 if result.get("success") else 400
     return jsonify(result), status
 

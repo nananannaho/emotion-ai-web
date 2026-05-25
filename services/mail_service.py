@@ -22,6 +22,7 @@ class MailService:
         to_email: str,
         display_name: str,
         reset_url: str,
+        reset_code: str,
     ) -> None:
         if not self.configured:
             raise RuntimeError("smtp_not_configured")
@@ -38,6 +39,8 @@ class MailService:
                 "아래 링크를 눌러 새 비밀번호를 설정해 주세요.",
                 "",
                 reset_url,
+                "",
+                f"링크가 열리지 않으면 인증번호 {reset_code} 를 입력해서도 재설정할 수 있습니다.",
                 "",
                 "이 링크는 1회만 사용할 수 있으며 일정 시간이 지나면 만료됩니다.",
                 "본인이 요청하지 않았다면 이 메일을 무시해 주세요.",

@@ -47,6 +47,7 @@
             <th>가입 시각</th>
             <th>감정 기록 수</th>
             <th>대화 수</th>
+            <th>관리</th>
           </tr>
         </thead>
         <tbody>
@@ -57,11 +58,22 @@
             <td>{{ user_item.created_at }}</td>
             <td>{{ user_item.mood_count }}</td>
             <td>{{ user_item.chat_count }}</td>
+            <td>
+              <button
+                type="button"
+                class="btn btn-ghost btn-danger admin-delete-btn"
+                data-username="{{ user_item.username }}"
+              >
+                계정 삭제
+              </button>
+            </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+    <p id="adminUserActionStatus" class="status-text"></p>
+    <p id="adminUserActionError" class="error-text" hidden></p>
     {% else %}
     <p class="admin-user-empty">아직 가입한 사용자가 없습니다.</p>
     {% endif %}
@@ -71,9 +83,60 @@
 
 {% block scripts %}
 <script>
+  const adminStatusEl = document.getElementById("adminUserActionStatus");
+  const adminErrorEl = document.getElementById("adminUserActionError");
+
   document.getElementById("adminLogoutBtn")?.addEventListener("click", async () => {
     await fetch("/api/logout", { method: "POST" });
     window.location.href = "/login";
+  });
+
+  document.querySelectorAll(".admin-delete-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const username = btn.dataset.username;
+      if (!username) return;
+      if (!window.confirm(`${username} 계정을 삭제할까요?\n얼굴 데이터와 대화 기록도 함께 삭제됩니다.`)) {
+        return;
+      }
+      if (adminErrorEl) {
+        adminErrorEl.hidden = true;
+        adminErrorEl.textContent = "";
+      }
+      if (adminStatusEl) {
+        adminStatusEl.textContent = "계정을 삭제하는 중입니다...";
+        adminStatusEl.style.color = "";
+      }
+      btn.disabled = true;
+      try {
+        const res = await fetch("/api/admin/users/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (adminStatusEl) {
+            adminStatusEl.textContent = data.message || "계정을 삭제했습니다.";
+            adminStatusEl.style.color = "#8ec9b0";
+          }
+          setTimeout(() => window.location.reload(), 500);
+          return;
+        }
+        if (adminErrorEl) {
+          adminErrorEl.hidden = false;
+          adminErrorEl.textContent = data.error || "계정 삭제에 실패했습니다.";
+        }
+        if (adminStatusEl) adminStatusEl.textContent = "";
+      } catch (err) {
+        if (adminErrorEl) {
+          adminErrorEl.hidden = false;
+          adminErrorEl.textContent = err.message || "서버 연결에 실패했습니다.";
+        }
+        if (adminStatusEl) adminStatusEl.textContent = "";
+      } finally {
+        btn.disabled = false;
+      }
+    });
   });
 </script>
 {% endblock %}

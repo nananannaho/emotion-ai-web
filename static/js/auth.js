@@ -194,8 +194,10 @@ const AuthHelper = (() => {
   }
 
   function initForgotPassword() {
-    const form = document.getElementById("forgotPasswordForm");
-    form?.addEventListener("submit", async (e) => {
+    const requestForm = document.getElementById("forgotPasswordForm");
+    const codeForm = document.getElementById("resetPasswordByCodeForm");
+
+    requestForm?.addEventListener("submit", async (e) => {
       e.preventDefault();
       showError("forgotPasswordError", "");
       setStatus("forgotPasswordStatus", "재설정 링크를 준비 중입니다...");
@@ -207,9 +209,53 @@ const AuthHelper = (() => {
         });
         if (data.success) {
           setStatus("forgotPasswordStatus", data.message || "이메일을 확인해 주세요.", "#8ec9b0");
-          e.target.reset();
+          codeForm?.querySelector('input[name="email"]')?.setAttribute("value", fd.get("email"));
+          const emailInput = codeForm?.querySelector('input[name="email"]');
+          if (emailInput && !emailInput.value) emailInput.value = fd.get("email");
         } else {
           showError("forgotPasswordError", data.error || "재설정 요청에 실패했습니다.");
+          setStatus("forgotPasswordStatus", "");
+        }
+      } catch (err) {
+        showError("forgotPasswordError", err.message || "서버 연결에 실패했습니다.");
+        setStatus("forgotPasswordStatus", "");
+      }
+    });
+
+    codeForm?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      showError("forgotPasswordError", "");
+      setStatus("forgotPasswordStatus", "");
+      const fd = new FormData(e.target);
+      const password = fd.get("password") || "";
+      const confirm = fd.get("password_confirm") || "";
+
+      if (password !== confirm) {
+        showError("forgotPasswordError", "비밀번호 확인이 일치하지 않습니다.");
+        return;
+      }
+
+      const pwdErr = validatePassword(password);
+      if (pwdErr) {
+        showError("forgotPasswordError", pwdErr);
+        return;
+      }
+
+      setStatus("forgotPasswordStatus", "인증번호를 확인하는 중입니다...");
+      try {
+        const data = await postJson("/api/password-reset/confirm-code", {
+          email: fd.get("email"),
+          code: fd.get("code"),
+          password,
+        });
+        if (data.success) {
+          setStatus("forgotPasswordStatus", data.message || "비밀번호가 재설정되었습니다.", "#8ec9b0");
+          e.target.reset();
+          setTimeout(() => {
+            window.location.href = "/login";
+          }, 1000);
+        } else {
+          showError("forgotPasswordError", data.error || "인증번호 확인에 실패했습니다.");
           setStatus("forgotPasswordStatus", "");
         }
       } catch (err) {

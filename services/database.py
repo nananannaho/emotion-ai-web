@@ -178,12 +178,16 @@ class Database:
                     CREATE TABLE IF NOT EXISTS password_reset_tokens (
                         token_selector VARCHAR(64) PRIMARY KEY,
                         token_hash TEXT NOT NULL,
+                        code_hash TEXT,
                         username VARCHAR(64) NOT NULL REFERENCES users(username) ON DELETE CASCADE,
                         expires_at TIMESTAMPTZ NOT NULL,
                         used_at TIMESTAMPTZ NULL,
                         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                     )
                     """
+                )
+                self._pg_run(
+                    "ALTER TABLE password_reset_tokens ADD COLUMN IF NOT EXISTS code_hash TEXT"
                 )
                 self._pg_run(
                     """
@@ -217,6 +221,7 @@ class Database:
                 CREATE TABLE IF NOT EXISTS password_reset_tokens (
                     token_selector TEXT PRIMARY KEY,
                     token_hash TEXT NOT NULL,
+                    code_hash TEXT,
                     username TEXT NOT NULL,
                     expires_at TEXT NOT NULL,
                     used_at TEXT,
@@ -230,6 +235,11 @@ class Database:
             }
             if "email" not in columns:
                 conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
+            reset_columns = {
+                row["name"] for row in conn.execute("PRAGMA table_info(password_reset_tokens)").fetchall()
+            }
+            if "code_hash" not in reset_columns:
+                conn.execute("ALTER TABLE password_reset_tokens ADD COLUMN code_hash TEXT")
             conn.execute(
                 """
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique
@@ -539,6 +549,7 @@ class Database:
         username: str,
         selector: str,
         token_hash: str,
+        code_hash: str,
         expires_at: str,
     ) -> None:
         u = _safe_username(username)
@@ -555,10 +566,10 @@ class Database:
                     cur.execute(
                         """
                         INSERT INTO password_reset_tokens
-                        (token_selector, token_hash, username, expires_at, used_at, created_at)
-                        VALUES (%s, %s, %s, %s, NULL, %s)
+                        (token_selector, token_hash, code_hash, username, expires_at, used_at, created_at)
+                        VALUES (%s, %s, %s, %s, %s, NULL, %s)
                         """,
-                        (selector, token_hash, u, expires_at, created_at),
+                        (selector, token_hash, code_hash, u, expires_at, created_at),
                     )
                 self._pg_commit()
             except Exception:
@@ -577,10 +588,10 @@ class Database:
             conn.execute(
                 """
                 INSERT INTO password_reset_tokens
-                (token_selector, token_hash, username, expires_at, used_at, created_at)
-                VALUES (?, ?, ?, ?, NULL, ?)
+                (token_selector, token_hash, code_hash, username, expires_at, used_at, created_at)
+                VALUES (?, ?, ?, ?, ?, NULL, ?)
                 """,
-                (selector, token_hash, u, expires_at, created_at),
+                (selector, token_hash, code_hash, u, expires_at, created_at),
             )
 
     def get_password_reset_token(self, selector: str) -> dict | None:
@@ -592,6 +603,7 @@ class Database:
                     cur.execute(
                         """
                         SELECT token_selector, token_hash, username, expires_at, used_at, created_at
+                        , code_hash
                         FROM password_reset_tokens
                         WHERE token_selector = %s
                         LIMIT 1
@@ -608,6 +620,7 @@ class Database:
                         "expires_at": str(row[3]),
                         "used_at": str(row[4]) if row[4] else None,
                         "created_at": str(row[5]),
+                        "code_hash": row[6],
                     }
             except Exception as exc:
                 logger.error("get_password_reset_token 오류: %s", exc)
@@ -618,11 +631,59 @@ class Database:
             row = conn.execute(
                 """
                 SELECT token_selector, token_hash, username, expires_at, used_at, created_at
+                , code_hash
                 FROM password_reset_tokens
                 WHERE token_selector = ?
                 LIMIT 1
                 """,
                 (selector,),
+            ).fetchone()
+            return dict(row) if row else None
+
+    def get_latest_password_reset_token_for_user(self, username: str) -> dict | None:
+        u = _safe_username(username)
+        if not u:
+            return None
+        if self._postgres:
+            try:
+                with self._pg_cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT token_selector, token_hash, code_hash, username, expires_at, used_at, created_at
+                        FROM password_reset_tokens
+                        WHERE username = %s
+                        ORDER BY created_at DESC
+                        LIMIT 1
+                        """,
+                        (u,),
+                    )
+                    row = cur.fetchone()
+                    if not row:
+                        return None
+                    return {
+                        "token_selector": row[0],
+                        "token_hash": row[1],
+                        "code_hash": row[2],
+                        "username": row[3],
+                        "expires_at": str(row[4]),
+                        "used_at": str(row[5]) if row[5] else None,
+                        "created_at": str(row[6]),
+                    }
+            except Exception as exc:
+                logger.error("get_latest_password_reset_token_for_user 오류: %s", exc)
+                self._pg_rollback()
+                raise
+
+        with self._sqlite() as conn:
+            row = conn.execute(
+                """
+                SELECT token_selector, token_hash, code_hash, username, expires_at, used_at, created_at
+                FROM password_reset_tokens
+                WHERE username = ?
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (u,),
             ).fetchone()
             return dict(row) if row else None
 
