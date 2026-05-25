@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% block title %}관리자{% endblock %}
+{% block head %}<meta name="robots" content="noindex,nofollow">{% endblock %}
 
 {% block navbar %}
 <nav class="navbar navbar--app">
   <a href="/admin" class="logo">
-    <span class="logo-icon">◈</span>
-    <span>Emotion<strong>AI</strong></span>
+    <img src="{{ url_for('static', filename='img/felunai-mark.svg') }}" alt="Felunai 로고" class="logo-icon logo-icon-image">
+    <span class="logo-wordmark">Felun<strong>ai</strong></span>
   </a>
   <div class="navbar-right">
     <div class="navbar-toolbar">
@@ -18,10 +19,11 @@
 {% block content %}
 <section class="admin-page">
   <header class="admin-header">
-    <div>
-      <h2>관리자 페이지</h2>
-      <p class="admin-sub">가입한 사용자 계정 목록과 최근 활동 요약을 확인할 수 있습니다.</p>
-    </div>
+    <article class="admin-hero glass">
+      <p class="admin-hero-eyebrow">Administrator Console</p>
+      <h2>환영합니다 관리자님.</h2>
+      <p class="admin-sub">Felunai 운영 현황을 차분하게 확인하고, 필요할 때만 계정과 재설정 요청을 관리할 수 있습니다.</p>
+    </article>
   </header>
 
   <section class="admin-summary-grid">

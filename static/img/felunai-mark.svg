@@ -1,0 +1,17 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="felunaiGlow" x1="58" y1="40" x2="196" y2="220" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#B4B1FF"/>
+      <stop offset="0.55" stop-color="#8D87FF"/>
+      <stop offset="1" stop-color="#655FE5"/>
+    </linearGradient>
+    <linearGradient id="felunaiShade" x1="86" y1="74" x2="56" y2="194" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1E173C" stop-opacity="0"/>
+      <stop offset="1" stop-color="#070A14" stop-opacity="0.9"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="#070A14"/>
+  <path d="M84 52H184C184 81.8234 159.823 106 130 106H112V156C112 185.823 87.8234 210 58 210V78C58 63.6406 69.6406 52 84 52Z" fill="url(#felunaiGlow)"/>
+  <path d="M84 118H180C180 147.823 155.823 172 126 172H112V178C112 197.882 95.8823 214 76 214V154C76 134.118 92.1177 118 112 118H84Z" fill="url(#felunaiGlow)"/>
+  <path d="M58 128V210C87.8234 210 112 185.823 112 156V128H58Z" fill="url(#felunaiShade)"/>
+</svg>

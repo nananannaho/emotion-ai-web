@@ -8,12 +8,40 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="format-detection" content="telephone=no">
-  <title>{% block title %}EmotionAI{% endblock %} | 감정 맞춤 챗봇</title>
+  {% set site_name = "Felunai" %}
+  {% set site_description = "표정 인식과 감정 맞춤 대화를 연결하는 세련된 AI 커뮤니케이션 서비스" %}
+  {% set canonical_url = request.base_url %}
+  <title>{% block title %}Felunai{% endblock %} | 정제된 감정 대화 경험</title>
+  <meta name="description" content="{{ site_description }}">
+  <meta name="keywords" content="Felunai, 감정 AI, 표정 인식, 감정 챗봇, 얼굴 로그인">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <link rel="canonical" href="{{ canonical_url }}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{ site_name }}">
+  <meta property="og:title" content="{{ site_name }} | 정제된 감정 대화 경험">
+  <meta property="og:description" content="{{ site_description }}">
+  <meta property="og:url" content="{{ canonical_url }}">
+  <meta property="og:image" content="{{ url_for('static', filename='img/felunai-mark.svg', _external=True) }}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ site_name }} | 정제된 감정 대화 경험">
+  <meta name="twitter:description" content="{{ site_description }}">
+  <meta name="twitter:image" content="{{ url_for('static', filename='img/felunai-mark.svg', _external=True) }}">
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/felunai-mark.svg') }}">
   <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=15">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=16">
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "{{ site_name }}",
+      "url": "{{ request.url_root.rstrip('/') }}",
+      "description": "{{ site_description }}",
+      "inLanguage": "ko-KR"
+    }
+  </script>
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -27,8 +55,8 @@
   {% block navbar %}
   <nav class="navbar">
     <a href="/" class="logo">
-      <span class="logo-icon">◈</span>
-      <span>Emotion<strong>AI</strong></span>
+      <img src="{{ url_for('static', filename='img/felunai-mark.svg') }}" alt="Felunai 로고" class="logo-icon logo-icon-image">
+      <span class="logo-wordmark">Felun<strong>ai</strong></span>
     </a>
     <div class="navbar-right">
       <div class="nav-links">
@@ -51,7 +79,7 @@
   </main>
 
   <footer class="footer">
-    <p>EmotionAI · 표정 기반 감정 맞춤 챗봇</p>
+    <p>Felunai · 표정 기반 감정 대화 플랫폼</p>
   </footer>
 
   <div id="guideModal" class="guide-modal" hidden aria-hidden="true">

@@ -1,7 +1,7 @@
 {
-  "name": "EmotionAI",
-  "short_name": "EmotionAI",
-  "description": "감정 인식 맞춤 챗봇",
+  "name": "Felunai",
+  "short_name": "Felunai",
+  "description": "표정 인식과 감정 맞춤 대화를 연결하는 AI 서비스",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0b1424",

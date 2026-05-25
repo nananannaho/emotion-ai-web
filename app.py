@@ -8,7 +8,7 @@ import logging
 import os
 import sys
 
-from flask import Flask, jsonify, redirect, render_template, request, session, url_for
+from flask import Flask, Response, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import ADMIN_USERNAME, DATABASE_URL, IS_CLOUD, SECRET_KEY, USE_LIGHT_ML
@@ -81,6 +81,39 @@ def health():
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.get("/robots.txt")
+def robots_txt():
+    body = "\n".join([
+        "User-agent: *",
+        "Allow: /",
+        "Disallow: /admin",
+        "Disallow: /dashboard",
+        f"Sitemap: {request.url_root.rstrip('/')}/sitemap.xml",
+    ])
+    return Response(body, mimetype="text/plain")
+
+
+@app.get("/sitemap.xml")
+def sitemap_xml():
+    root = request.url_root.rstrip("/")
+    urls = [
+        f"{root}/",
+        f"{root}/login",
+        f"{root}/register",
+        f"{root}/forgot-password",
+    ]
+    body = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ]
+    body.extend(
+        f"  <url><loc>{loc}</loc></url>"
+        for loc in urls
+    )
+    body.append("</urlset>")
+    return Response("\n".join(body), mimetype="application/xml")
 
 
 @app.route("/register")

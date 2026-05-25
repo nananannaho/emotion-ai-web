@@ -28,14 +28,14 @@ class MailService:
             raise RuntimeError("smtp_not_configured")
 
         msg = EmailMessage()
-        msg["Subject"] = "[EmotionAI] 비밀번호 재설정 링크"
+        msg["Subject"] = "[Felunai] 비밀번호 재설정 링크"
         msg["From"] = MAIL_FROM
         msg["To"] = to_email
         msg.set_content(
             "\n".join([
                 f"{display_name}님, 안녕하세요.",
                 "",
-                "EmotionAI 비밀번호 재설정 요청이 접수되었습니다.",
+                "Felunai 비밀번호 재설정 요청이 접수되었습니다.",
                 "아래 링크를 눌러 새 비밀번호를 설정해 주세요.",
                 "",
                 reset_url,

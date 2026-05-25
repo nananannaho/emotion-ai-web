@@ -87,7 +87,7 @@ class LocalChatEngine:
 
     CANDIDATES: list[ResponseCandidate] = [
         ResponseCandidate(
-            "안녕하세요! 저는 감정을 읽고 맞춤 대화를 도와주는 EmotionAI예요. 오늘 무슨 일이 있었나요?",
+            "안녕하세요. 저는 감정을 읽고 대화를 돕는 Felunai예요. 오늘은 어떤 하루를 보내셨나요?",
             intents=["greeting"],
             emotions=["neutral", "happy"],
         ),
