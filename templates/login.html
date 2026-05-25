@@ -44,6 +44,7 @@
           <input type="password" name="password" required autocomplete="current-password">
         </label>
         <button type="submit" class="btn btn-primary btn-block">로그인</button>
+        <a href="/forgot-password" class="btn btn-ghost btn-block">이메일로 인증번호 받기</a>
         <p class="auth-footer"><a href="/forgot-password">비밀번호 재설정</a></p>
       </form>
     </div>
@@ -57,7 +58,7 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/api.js') }}"></script>
 <script src="{{ url_for('static', filename='js/camera.js') }}"></script>
-<script src="{{ url_for('static', filename='js/auth.js') }}?v=15"></script>
+<script src="{{ url_for('static', filename='js/auth.js') }}?v=16"></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     CameraHelper.init('loginVideo', 'loginCanvas');

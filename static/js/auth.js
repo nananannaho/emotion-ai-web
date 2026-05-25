@@ -196,22 +196,29 @@ const AuthHelper = (() => {
   function initForgotPassword() {
     const requestForm = document.getElementById("forgotPasswordForm");
     const codeForm = document.getElementById("resetPasswordByCodeForm");
+    const codeBtn = document.getElementById("sendResetCodeBtn");
 
-    requestForm?.addEventListener("submit", async (e) => {
-      e.preventDefault();
+    async function requestResetMail(email, mode = "link") {
       showError("forgotPasswordError", "");
-      setStatus("forgotPasswordStatus", "재설정 링크를 준비 중입니다...");
-      const fd = new FormData(e.target);
+      setStatus(
+        "forgotPasswordStatus",
+        mode === "code" ? "인증번호를 준비 중입니다..." : "재설정 링크를 준비 중입니다..."
+      );
 
       try {
-        const data = await postJson("/api/password-reset/request", {
-          email: fd.get("email"),
-        });
+        const data = await postJson("/api/password-reset/request", { email });
         if (data.success) {
-          setStatus("forgotPasswordStatus", data.message || "이메일을 확인해 주세요.", "#8ec9b0");
-          codeForm?.querySelector('input[name="email"]')?.setAttribute("value", fd.get("email"));
+          const successMsg =
+            mode === "code"
+              ? "입력한 이메일로 인증번호를 보냈습니다. 계정이 없다면 메일이 오지 않을 수 있습니다."
+              : (data.message || "이메일을 확인해 주세요.");
+          setStatus("forgotPasswordStatus", successMsg, "#8ec9b0");
+          codeForm?.querySelector('input[name="email"]')?.setAttribute("value", email);
           const emailInput = codeForm?.querySelector('input[name="email"]');
-          if (emailInput && !emailInput.value) emailInput.value = fd.get("email");
+          if (emailInput) emailInput.value = email;
+          if (mode === "code") {
+            codeForm?.querySelector('input[name="code"]')?.focus();
+          }
         } else {
           showError("forgotPasswordError", data.error || "재설정 요청에 실패했습니다.");
           setStatus("forgotPasswordStatus", "");
@@ -220,6 +227,26 @@ const AuthHelper = (() => {
         showError("forgotPasswordError", err.message || "서버 연결에 실패했습니다.");
         setStatus("forgotPasswordStatus", "");
       }
+    }
+
+    requestForm?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      await requestResetMail(fd.get("email"), "link");
+    });
+
+    codeBtn?.addEventListener("click", async () => {
+      const email =
+        requestForm?.querySelector('input[name="email"]')?.value ||
+        codeForm?.querySelector('input[name="email"]')?.value ||
+        "";
+      if (!String(email).trim()) {
+        showError("forgotPasswordError", "이메일 주소를 먼저 입력해 주세요.");
+        setStatus("forgotPasswordStatus", "");
+        requestForm?.querySelector('input[name="email"]')?.focus();
+        return;
+      }
+      await requestResetMail(email, "code");
     });
 
     codeForm?.addEventListener("submit", async (e) => {

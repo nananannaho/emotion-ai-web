@@ -297,7 +297,7 @@ def api_password_reset_request():
 
     return jsonify({
         "success": True,
-        "message": "입력한 이메일로 재설정 링크를 보냈습니다. 계정이 없다면 메일이 오지 않을 수 있습니다.",
+        "message": "입력한 이메일로 재설정 링크와 인증번호를 보냈습니다. 계정이 없다면 메일이 오지 않을 수 있습니다.",
     })
 
 

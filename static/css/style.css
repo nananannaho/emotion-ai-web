@@ -522,6 +522,12 @@ body {
   box-shadow: 0 0 0 3px rgba(110, 180, 212, 0.2);
 }
 
+.auth-action-stack {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
 .auth-footer {
   text-align: center;
   margin-top: 1.5rem;
