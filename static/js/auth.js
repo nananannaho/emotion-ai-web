@@ -175,7 +175,7 @@ const AuthHelper = (() => {
           password: fd.get("password"),
         });
         if (data.success) {
-          window.location.href = "/dashboard";
+          window.location.href = data.redirect_to || "/dashboard";
         } else {
           showError("loginError", data.error || "로그인 실패");
         }

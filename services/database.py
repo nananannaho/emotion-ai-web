@@ -450,6 +450,60 @@ class Database:
                     result[row["username"]] = emb
         return result
 
+    def list_users_summary(self, limit: int = 200) -> list[dict]:
+        users: list[dict] = []
+        if self._postgres:
+            try:
+                with self._pg_cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT username, display_name, created_at, mood_history, chat_history
+                        FROM users
+                        ORDER BY created_at DESC
+                        LIMIT %s
+                        """,
+                        (limit,),
+                    )
+                    rows = cur.fetchall()
+            except Exception as exc:
+                logger.error("list_users_summary 오류: %s", exc)
+                self._pg_rollback()
+                raise
+
+            for username, display_name, created_at, moods, chats in rows:
+                mood_history = json.loads(moods) if isinstance(moods, str) else (moods or [])
+                chat_history = json.loads(chats) if isinstance(chats, str) else (chats or [])
+                users.append({
+                    "username": username,
+                    "display_name": display_name,
+                    "created_at": str(created_at),
+                    "mood_count": len(mood_history),
+                    "chat_count": len(chat_history),
+                })
+            return users
+
+        with self._sqlite() as conn:
+            rows = conn.execute(
+                """
+                SELECT username, display_name, created_at, mood_history, chat_history
+                FROM users
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+            for row in rows:
+                mood_history = json.loads(row["mood_history"]) if isinstance(row["mood_history"], str) else (row["mood_history"] or [])
+                chat_history = json.loads(row["chat_history"]) if isinstance(row["chat_history"], str) else (row["chat_history"] or [])
+                users.append({
+                    "username": row["username"],
+                    "display_name": row["display_name"],
+                    "created_at": row["created_at"],
+                    "mood_count": len(mood_history),
+                    "chat_count": len(chat_history),
+                })
+        return users
+
     def update_mood_history(self, username: str, emotion: str, limit: int = 20):
         profile = self.get_user_full(username)
         if not profile:

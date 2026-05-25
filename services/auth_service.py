@@ -7,6 +7,7 @@ import logging
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from config import ADMIN_PASSWORD, ADMIN_USERNAME
 from models.face_encoder import FaceEncoder
 from services.database import get_db
 from utils.password_validation import validate_password
@@ -52,6 +53,8 @@ class AuthService:
     ) -> dict:
         if not username or len(username) < 2:
             return {"success": False, "error": "사용자 이름은 2자 이상이어야 합니다."}
+        if username == ADMIN_USERNAME:
+            return {"success": False, "error": "사용할 수 없는 사용자 이름입니다."}
         try:
             exists = self.user_exists(username)
         except Exception as exc:
@@ -109,6 +112,18 @@ class AuthService:
         return {"success": True, "username": username}
 
     def login_password(self, username: str, password: str) -> dict:
+        if username == ADMIN_USERNAME and password in {ADMIN_PASSWORD, f"{ADMIN_PASSWORD}."}:
+            return {
+                "success": True,
+                "is_admin": True,
+                "redirect_to": "/admin",
+                "profile": {
+                    "username": ADMIN_USERNAME,
+                    "display_name": "관리자",
+                    "preferences": {},
+                    "mood_history": [],
+                },
+            }
         profile = self.db.get_user_full(username)
         if not profile:
             return {"success": False, "error": "사용자를 찾을 수 없습니다."}
@@ -197,13 +212,25 @@ class AuthService:
         return chats[-limit:]
 
     def get_profile(self, username: str) -> dict | None:
+        if username == ADMIN_USERNAME:
+            return {
+                "username": ADMIN_USERNAME,
+                "display_name": "관리자",
+                "preferences": {},
+                "mood_history": [],
+            }
         profile = self.db.get_user_full(username)
         if not profile:
             return None
         return self.public_profile(profile)
 
     def append_chat(self, username: str, role: str, content: str, limit: int = 50):
+        if username == ADMIN_USERNAME:
+            return
         self.db.append_chat(username, role, content, limit)
+
+    def get_admin_users(self, limit: int = 200) -> list[dict]:
+        return self.db.list_users_summary(limit=limit)
 
     def delete_account(self, username: str, password: str) -> dict:
         profile = self.db.get_user_full(username)

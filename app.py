@@ -8,10 +8,10 @@ import logging
 import os
 import sys
 
-from flask import Flask, jsonify, render_template, request, session
+from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from config import DATABASE_URL, IS_CLOUD, SECRET_KEY, USE_LIGHT_ML
+from config import ADMIN_USERNAME, DATABASE_URL, IS_CLOUD, SECRET_KEY, USE_LIGHT_ML
 from services.database import get_db
 from services.auth_service import AuthService
 from services.chatbot_service import ChatbotService
@@ -50,7 +50,12 @@ def inject_globals():
         "is_cloud": IS_CLOUD,
         "use_light_ml": USE_LIGHT_ML,
         "logged_in": bool(session.get("user")),
+        "is_admin": bool(session.get("is_admin")),
     }
+
+
+def _is_admin_session() -> bool:
+    return bool(session.get("is_admin")) and session.get("user") == ADMIN_USERNAME
 
 
 @app.get("/health")
@@ -83,6 +88,8 @@ def register_page():
 
 @app.route("/login")
 def login_page():
+    if _is_admin_session():
+        return redirect(url_for("admin_page"))
     return render_template("login.html")
 
 
@@ -90,7 +97,22 @@ def login_page():
 def dashboard():
     if not session.get("user"):
         return render_template("login.html", error="로그인이 필요합니다.")
+    if _is_admin_session():
+        return redirect(url_for("admin_page"))
     return render_template("dashboard.html", user=session["user"], app_nav=True)
+
+
+@app.route("/admin")
+def admin_page():
+    if not _is_admin_session():
+        return render_template("login.html", error="관리자 로그인이 필요합니다.")
+    users = auth_service.get_admin_users(limit=300)
+    return render_template(
+        "admin.html",
+        user=session["user"],
+        users=users,
+        total_users=len(users),
+    )
 
 
 @app.post("/api/register")
@@ -113,6 +135,7 @@ def api_register():
             face_image_bgr=image,
         )
         if result.get("success"):
+            session.clear()
             session["user"] = result["username"]
         status = 200 if result.get("success") else 400
         return jsonify(result), status
@@ -143,7 +166,10 @@ def api_login_password():
         password=data.get("password") or "",
     )
     if result.get("success"):
+        session.clear()
         session["user"] = result["profile"]["username"]
+        if result.get("is_admin"):
+            session["is_admin"] = True
     status = 200 if result.get("success") else 401
     return jsonify(result), status
 
@@ -168,6 +194,7 @@ def api_login_face():
             face_image_bgr=image,
         )
         if result.get("success"):
+            session.clear()
             session["user"] = result["profile"]["username"]
         status = 200 if result.get("success") else 401
         return jsonify(result), status
@@ -181,6 +208,8 @@ def api_login_face():
 
 @app.post("/api/emotion/analyze")
 def api_analyze_emotion():
+    if _is_admin_session():
+        return jsonify({"success": False, "error": "관리자 계정에서는 표정 분석을 사용할 수 없습니다."}), 403
     data = request.get_json(silent=True) or {}
     image = emotion_service.decode_image(data.get("image", ""))
     if image is None:
@@ -199,6 +228,8 @@ def api_analyze_emotion():
 def api_chat():
     if not session.get("user"):
         return jsonify({"success": False, "error": "로그인이 필요합니다."}), 401
+    if _is_admin_session():
+        return jsonify({"success": False, "error": "관리자 계정에서는 챗봇을 사용할 수 없습니다."}), 403
 
     data = request.get_json(silent=True) or {}
     message = (data.get("message") or "").strip()
@@ -228,7 +259,7 @@ def api_session():
     if not user:
         return jsonify({"logged_in": False})
     profile = auth_service.get_profile(user)
-    return jsonify({"logged_in": True, "profile": profile})
+    return jsonify({"logged_in": True, "is_admin": _is_admin_session(), "profile": profile})
 
 
 @app.post("/api/logout")
@@ -241,6 +272,8 @@ def api_logout():
 def api_delete_account():
     if not session.get("user"):
         return jsonify({"success": False, "error": "로그인이 필요합니다."}), 401
+    if _is_admin_session():
+        return jsonify({"success": False, "error": "관리자 계정은 삭제할 수 없습니다."}), 403
 
     data = request.get_json(silent=True) or {}
     password = data.get("password") or ""
@@ -257,6 +290,8 @@ def api_delete_account():
 def api_update_face():
     if not session.get("user"):
         return jsonify({"success": False, "error": "로그인이 필요합니다."}), 401
+    if _is_admin_session():
+        return jsonify({"success": False, "error": "관리자 계정은 얼굴 재등록을 사용할 수 없습니다."}), 403
     data = request.get_json(silent=True) or {}
     image = emotion_service.decode_image(data.get("face_image", ""))
     if image is None:

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}관리자{% endblock %}
+
+{% block navbar %}
+<nav class="navbar navbar--app">
+  <a href="/admin" class="logo">
+    <span class="logo-icon">◈</span>
+    <span>Emotion<strong>AI</strong></span>
+  </a>
+  <div class="navbar-right">
+    <div class="navbar-toolbar">
+      <button type="button" id="adminLogoutBtn" class="btn btn-ghost">로그아웃</button>
+    </div>
+  </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<section class="admin-page">
+  <header class="admin-header">
+    <div>
+      <h2>관리자 페이지</h2>
+      <p class="admin-sub">가입한 사용자 계정 목록과 최근 활동 요약을 확인할 수 있습니다.</p>
+    </div>
+  </header>
+
+  <section class="admin-summary-grid">
+    <article class="admin-stat-card glass">
+      <h3>전체 가입자</h3>
+      <strong>{{ total_users }}</strong>
+    </article>
+    <article class="admin-stat-card glass">
+      <h3>최근 가입 계정</h3>
+      <strong>{% if users %}{{ users[0].username }}{% else %}-{% endif %}</strong>
+    </article>
+  </section>
+
+  <section class="admin-users-card glass">
+    <h3>가입자 목록</h3>
+    {% if users %}
+    <div class="admin-user-table-wrap">
+      <table class="admin-user-table">
+        <thead>
+          <tr>
+            <th>아이디</th>
+            <th>표시 이름</th>
+            <th>가입 시각</th>
+            <th>감정 기록 수</th>
+            <th>대화 수</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for user_item in users %}
+          <tr>
+            <td>{{ user_item.username }}</td>
+            <td>{{ user_item.display_name }}</td>
+            <td>{{ user_item.created_at }}</td>
+            <td>{{ user_item.mood_count }}</td>
+            <td>{{ user_item.chat_count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="admin-user-empty">아직 가입한 사용자가 없습니다.</p>
+    {% endif %}
+  </section>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.getElementById("adminLogoutBtn")?.addEventListener("click", async () => {
+    await fetch("/api/logout", { method: "POST" });
+    window.location.href = "/login";
+  });
+</script>
+{% endblock %}
