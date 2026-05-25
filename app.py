@@ -74,7 +74,7 @@ def health():
         "emotion_ml": (WEIGHTS_DIR / "emotion_clf.joblib").exists(),
         "database": db.backend,
         "database_url_set": bool(DATABASE_URL),
-        "api_version": 13,
+        "api_version": 14,
     })
 
 
@@ -187,6 +187,7 @@ def api_register_email_code_request():
             mail_service.send_signup_verification_email(
                 to_email=result["email"],
                 verification_code=result["verification_code"],
+                site_url=request.url_root.rstrip("/"),
             )
     except Exception as exc:
         logger.exception("회원가입 이메일 인증 메일 발송 실패: %s", exc)
@@ -330,6 +331,7 @@ def api_password_reset_request():
                 display_name=result["display_name"],
                 reset_url=reset_url,
                 reset_code=result["reset_code"],
+                site_url=request.url_root.rstrip("/"),
             )
     except Exception as exc:
         logger.exception("비밀번호 재설정 메일 발송 실패: %s", exc)
