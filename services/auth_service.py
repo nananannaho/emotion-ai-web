@@ -2,17 +2,22 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
+import re
+import secrets
+from datetime import datetime, timedelta, timezone
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from config import ADMIN_PASSWORD, ADMIN_USERNAME
+from config import ADMIN_PASSWORD, ADMIN_USERNAME, PASSWORD_RESET_TTL_MINUTES
 from models.face_encoder import FaceEncoder
 from services.database import get_db
 from utils.password_validation import validate_password
 
 logger = logging.getLogger(__name__)
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 class AuthService:
@@ -22,6 +27,14 @@ class AuthService:
 
     def user_exists(self, username: str) -> bool:
         return self.db.user_exists(username)
+
+    @staticmethod
+    def normalize_email(email: str) -> str:
+        return (email or "").strip().lower()
+
+    @staticmethod
+    def is_valid_email(email: str) -> bool:
+        return bool(EMAIL_RE.match((email or "").strip()))
 
     def _find_face_conflict(
         self,
@@ -46,6 +59,7 @@ class AuthService:
     def register(
         self,
         username: str,
+        email: str,
         password: str,
         display_name: str,
         preferences: dict | None,
@@ -55,6 +69,9 @@ class AuthService:
             return {"success": False, "error": "사용자 이름은 2자 이상이어야 합니다."}
         if username == ADMIN_USERNAME:
             return {"success": False, "error": "사용할 수 없는 사용자 이름입니다."}
+        email = self.normalize_email(email)
+        if not self.is_valid_email(email):
+            return {"success": False, "error": "올바른 이메일 주소를 입력해 주세요."}
         try:
             exists = self.user_exists(username)
         except Exception as exc:
@@ -62,6 +79,12 @@ class AuthService:
             return {"success": False, "error": "데이터베이스 연결 오류입니다. 잠시 후 다시 시도해 주세요."}
         if exists:
             return {"success": False, "error": "이미 존재하는 사용자입니다."}
+        try:
+            if self.db.email_exists(email):
+                return {"success": False, "error": "이미 가입된 이메일입니다."}
+        except Exception as exc:
+            logger.exception("email_exists 실패: %s", exc)
+            return {"success": False, "error": "데이터베이스 연결 오류입니다. 잠시 후 다시 시도해 주세요."}
 
         pwd_err = validate_password(password)
         if pwd_err:
@@ -94,6 +117,7 @@ class AuthService:
             self.db.create_user(
                 username=username,
                 display_name=display_name or username,
+                email=email,
                 password_hash=generate_password_hash(password),
                 preferences=prefs,
                 embedding=embedding,
@@ -130,6 +154,77 @@ class AuthService:
         if not check_password_hash(profile["password_hash"], password):
             return {"success": False, "error": "비밀번호가 올바르지 않습니다."}
         return {"success": True, "profile": self.public_profile(profile)}
+
+    def request_password_reset(self, email: str) -> dict:
+        email = self.normalize_email(email)
+        if not self.is_valid_email(email):
+            return {"success": False, "error": "올바른 이메일 주소를 입력해 주세요."}
+
+        profile = self.db.get_user_by_email(email)
+        if not profile or profile["username"] == ADMIN_USERNAME:
+            return {"success": True, "email_sent": False}
+
+        selector = secrets.token_urlsafe(12)
+        verifier = secrets.token_urlsafe(32)
+        token_hash = hashlib.sha256(verifier.encode("utf-8")).hexdigest()
+        expires_at = (
+            datetime.now(timezone.utc) + timedelta(minutes=PASSWORD_RESET_TTL_MINUTES)
+        ).isoformat()
+        self.db.save_password_reset_token(
+            username=profile["username"],
+            selector=selector,
+            token_hash=token_hash,
+            expires_at=expires_at,
+        )
+        return {
+            "success": True,
+            "email_sent": True,
+            "username": profile["username"],
+            "display_name": profile.get("display_name") or profile["username"],
+            "email": email,
+            "selector": selector,
+            "token": verifier,
+            "expires_at": expires_at,
+        }
+
+    def verify_password_reset_token(self, selector: str, token: str) -> dict:
+        selector = (selector or "").strip()
+        token = (token or "").strip()
+        if not selector or not token:
+            return {"success": False, "error": "재설정 링크가 올바르지 않습니다."}
+
+        record = self.db.get_password_reset_token(selector)
+        if not record:
+            return {"success": False, "error": "재설정 링크가 유효하지 않습니다."}
+        if record.get("used_at"):
+            return {"success": False, "error": "이미 사용된 재설정 링크입니다."}
+
+        expires_at = datetime.fromisoformat(str(record["expires_at"]))
+        if expires_at < datetime.now(timezone.utc):
+            return {"success": False, "error": "재설정 링크가 만료되었습니다."}
+
+        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        if token_hash != record.get("token_hash"):
+            return {"success": False, "error": "재설정 링크가 유효하지 않습니다."}
+
+        profile = self.db.get_user_full(record["username"])
+        if not profile:
+            return {"success": False, "error": "사용자를 찾을 수 없습니다."}
+        return {"success": True, "username": profile["username"], "email": profile.get("email", "")}
+
+    def reset_password(self, selector: str, token: str, new_password: str) -> dict:
+        token_check = self.verify_password_reset_token(selector, token)
+        if not token_check.get("success"):
+            return token_check
+
+        pwd_err = validate_password(new_password)
+        if pwd_err:
+            return {"success": False, "error": pwd_err}
+
+        username = token_check["username"]
+        self.db.update_password_hash(username, generate_password_hash(new_password))
+        self.db.mark_password_reset_token_used((selector or "").strip())
+        return {"success": True, "message": "비밀번호가 재설정되었습니다."}
 
     def login_face(self, username: str, face_image_bgr) -> dict:
         username = (username or "").strip()
@@ -282,6 +377,7 @@ class AuthService:
         return {
             "username": profile["username"],
             "display_name": profile["display_name"],
+            "email": profile.get("email", ""),
             "preferences": prefs,
             "mood_history": moods[-10:],
         }

@@ -16,6 +16,7 @@ from services.database import get_db
 from services.auth_service import AuthService
 from services.chatbot_service import ChatbotService
 from services.emotion_service import EmotionService
+from services.mail_service import MailService
 
 logging.basicConfig(
     level=logging.INFO,
@@ -38,6 +39,7 @@ try:
     auth_service = AuthService()
     emotion_service = EmotionService()
     chatbot_service = ChatbotService()
+    mail_service = MailService()
     logger.info("EmotionAI 서비스 초기화 완료 (light_ml=%s)", USE_LIGHT_ML)
 except Exception:
     logger.exception("서비스 초기화 실패 — 배포 설정을 확인하세요")
@@ -72,7 +74,7 @@ def health():
         "emotion_ml": (WEIGHTS_DIR / "emotion_clf.joblib").exists(),
         "database": db.backend,
         "database_url_set": bool(DATABASE_URL),
-        "api_version": 10,
+        "api_version": 11,
     })
 
 
@@ -91,6 +93,25 @@ def login_page():
     if _is_admin_session():
         return redirect(url_for("admin_page"))
     return render_template("login.html")
+
+
+@app.route("/forgot-password")
+def forgot_password_page():
+    return render_template("forgot_password.html")
+
+
+@app.route("/reset-password")
+def reset_password_page():
+    selector = (request.args.get("selector") or "").strip()
+    token = (request.args.get("token") or "").strip()
+    verify = auth_service.verify_password_reset_token(selector, token)
+    return render_template(
+        "reset_password.html",
+        selector=selector,
+        token=token,
+        token_valid=bool(verify.get("success")),
+        token_error=verify.get("error", ""),
+    )
 
 
 @app.route("/dashboard")
@@ -129,6 +150,7 @@ def api_register():
 
         result = auth_service.register(
             username=(data.get("username") or "").strip(),
+            email=(data.get("email") or "").strip(),
             password=data.get("password") or "",
             display_name=(data.get("display_name") or "").strip(),
             preferences=data.get("preferences"),
@@ -204,6 +226,57 @@ def api_login_face():
             "success": False,
             "error": "로그인 처리 중 서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
         }), 500
+
+
+@app.post("/api/password-reset/request")
+def api_password_reset_request():
+    if not mail_service.configured:
+        return jsonify({
+            "success": False,
+            "error": "비밀번호 재설정 메일 기능이 아직 설정되지 않았습니다.",
+        }), 503
+
+    data = request.get_json(silent=True) or {}
+    result = auth_service.request_password_reset(data.get("email") or "")
+    if not result.get("success"):
+        return jsonify(result), 400
+
+    try:
+        if result.get("email_sent"):
+            reset_url = url_for(
+                "reset_password_page",
+                selector=result["selector"],
+                token=result["token"],
+                _external=True,
+            )
+            mail_service.send_password_reset_email(
+                to_email=result["email"],
+                display_name=result["display_name"],
+                reset_url=reset_url,
+            )
+    except Exception as exc:
+        logger.exception("비밀번호 재설정 메일 발송 실패: %s", exc)
+        return jsonify({
+            "success": False,
+            "error": "비밀번호 재설정 메일을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.",
+        }), 500
+
+    return jsonify({
+        "success": True,
+        "message": "입력한 이메일로 재설정 링크를 보냈습니다. 계정이 없다면 메일이 오지 않을 수 있습니다.",
+    })
+
+
+@app.post("/api/password-reset/confirm")
+def api_password_reset_confirm():
+    data = request.get_json(silent=True) or {}
+    result = auth_service.reset_password(
+        selector=data.get("selector") or "",
+        token=data.get("token") or "",
+        new_password=data.get("password") or "",
+    )
+    status = 200 if result.get("success") else 400
+    return jsonify(result), status
 
 
 @app.post("/api/emotion/analyze")

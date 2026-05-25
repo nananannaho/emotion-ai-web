@@ -153,6 +153,7 @@ class Database:
                     CREATE TABLE IF NOT EXISTS users (
                         username VARCHAR(64) PRIMARY KEY,
                         display_name VARCHAR(128) NOT NULL,
+                        email VARCHAR(255),
                         password_hash TEXT NOT NULL,
                         preferences TEXT NOT NULL DEFAULT '{}',
                         mood_history TEXT NOT NULL DEFAULT '[]',
@@ -162,11 +163,33 @@ class Database:
                     """
                 )
                 self._pg_run(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255)"
+                )
+                self._pg_run(
                     """
                     CREATE TABLE IF NOT EXISTS face_embeddings (
                         username VARCHAR(64) PRIMARY KEY REFERENCES users(username) ON DELETE CASCADE,
                         embedding BYTEA NOT NULL
                     )
+                    """
+                )
+                self._pg_run(
+                    """
+                    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                        token_selector VARCHAR(64) PRIMARY KEY,
+                        token_hash TEXT NOT NULL,
+                        username VARCHAR(64) NOT NULL REFERENCES users(username) ON DELETE CASCADE,
+                        expires_at TIMESTAMPTZ NOT NULL,
+                        used_at TIMESTAMPTZ NULL,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                    """
+                )
+                self._pg_run(
+                    """
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique
+                    ON users (LOWER(email))
+                    WHERE email IS NOT NULL AND email <> ''
                     """
                 )
                 return
@@ -191,6 +214,27 @@ class Database:
                     embedding BLOB NOT NULL,
                     FOREIGN KEY (username) REFERENCES users(username) ON DELETE CASCADE
                 );
+                CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                    token_selector TEXT PRIMARY KEY,
+                    token_hash TEXT NOT NULL,
+                    username TEXT NOT NULL,
+                    expires_at TEXT NOT NULL,
+                    used_at TEXT,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (username) REFERENCES users(username) ON DELETE CASCADE
+                );
+                """
+            )
+            columns = {
+                row["name"] for row in conn.execute("PRAGMA table_info(users)").fetchall()
+            }
+            if "email" not in columns:
+                conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
+            conn.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique
+                ON users(email COLLATE NOCASE)
+                WHERE email IS NOT NULL AND email <> ''
                 """
             )
 
@@ -233,6 +277,7 @@ class Database:
                 self._insert_user(
                     username=username,
                     display_name=profile.get("display_name", username),
+                    email=profile.get("email", ""),
                     password_hash=profile["password_hash"],
                     preferences=profile.get("preferences", {}),
                     mood_history=profile.get("mood_history", []),
@@ -271,6 +316,7 @@ class Database:
         self,
         username: str,
         display_name: str,
+        email: str,
         password_hash: str,
         preferences: dict,
         mood_history: list,
@@ -287,27 +333,28 @@ class Database:
         if self._postgres:
             self._pg_run(
                 """
-                INSERT INTO users (username, display_name, password_hash, preferences, mood_history, chat_history, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                INSERT INTO users (username, display_name, email, password_hash, preferences, mood_history, chat_history, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
                 ON CONFLICT (username) DO NOTHING
                 """,
-                (u, display_name, password_hash, prefs, moods, chats),
+                (u, display_name, email or None, password_hash, prefs, moods, chats),
             )
         else:
             with self._sqlite() as conn:
                 conn.execute(
                     """
                     INSERT OR IGNORE INTO users
-                    (username, display_name, password_hash, preferences, mood_history, chat_history, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    (username, display_name, email, password_hash, preferences, mood_history, chat_history, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (u, display_name, password_hash, prefs, moods, chats, now),
+                    (u, display_name, email or "", password_hash, prefs, moods, chats, now),
                 )
 
     def create_user(
         self,
         username: str,
         display_name: str,
+        email: str,
         password_hash: str,
         preferences: dict,
         embedding: np.ndarray,
@@ -325,10 +372,10 @@ class Database:
                 with self._pg_cursor() as cur:
                     cur.execute(
                         """
-                        INSERT INTO users (username, display_name, password_hash, preferences, mood_history, chat_history, created_at)
-                        VALUES (%s, %s, %s, %s, '[]', '[]', NOW())
+                        INSERT INTO users (username, display_name, email, password_hash, preferences, mood_history, chat_history, created_at)
+                        VALUES (%s, %s, %s, %s, %s, '[]', '[]', NOW())
                         """,
-                        (u, display_name, password_hash, prefs),
+                        (u, display_name, email or None, password_hash, prefs),
                     )
                     cur.execute(
                         """
@@ -346,6 +393,7 @@ class Database:
         self._insert_user(
             username=u,
             display_name=display_name,
+            email=email,
             password_hash=password_hash,
             preferences=preferences,
             mood_history=[],
@@ -400,6 +448,215 @@ class Database:
             if not row:
                 return None
             return dict(row)
+
+    def get_user_by_email(self, email: str) -> dict | None:
+        target = (email or "").strip().lower()
+        if not target:
+            return None
+        if self._postgres:
+            try:
+                self._pg_ensure_alive()
+                with self._postgres.cursor(cursor_factory=self._pg_extras.RealDictCursor) as cur:
+                    cur.execute(
+                        "SELECT * FROM users WHERE LOWER(email) = %s LIMIT 1",
+                        (target,),
+                    )
+                    row = cur.fetchone()
+                    return dict(row) if row else None
+            except Exception as exc:
+                logger.error("get_user_by_email 오류: %s", exc)
+                self._pg_rollback()
+                raise
+        with self._sqlite() as conn:
+            row = conn.execute(
+                "SELECT * FROM users WHERE LOWER(email) = ? LIMIT 1",
+                (target,),
+            ).fetchone()
+            return dict(row) if row else None
+
+    def email_exists(self, email: str, exclude_username: str | None = None) -> bool:
+        target = (email or "").strip().lower()
+        if not target:
+            return False
+        exclude = _safe_username(exclude_username or "")
+        if self._postgres:
+            try:
+                with self._pg_cursor() as cur:
+                    if exclude:
+                        cur.execute(
+                            """
+                            SELECT 1 FROM users
+                            WHERE LOWER(email) = %s AND username <> %s
+                            LIMIT 1
+                            """,
+                            (target, exclude),
+                        )
+                    else:
+                        cur.execute(
+                            "SELECT 1 FROM users WHERE LOWER(email) = %s LIMIT 1",
+                            (target,),
+                        )
+                    return cur.fetchone() is not None
+            except Exception as exc:
+                logger.error("email_exists 오류: %s", exc)
+                self._pg_rollback()
+                raise
+        with self._sqlite() as conn:
+            if exclude:
+                row = conn.execute(
+                    """
+                    SELECT 1 FROM users
+                    WHERE LOWER(email) = ? AND username <> ?
+                    LIMIT 1
+                    """,
+                    (target, exclude),
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    "SELECT 1 FROM users WHERE LOWER(email) = ? LIMIT 1",
+                    (target,),
+                ).fetchone()
+            return row is not None
+
+    def update_password_hash(self, username: str, password_hash: str) -> None:
+        u = _safe_username(username)
+        if not u:
+            raise ValueError("유효하지 않은 사용자 이름입니다.")
+        if self._postgres:
+            self._pg_run(
+                "UPDATE users SET password_hash = %s WHERE username = %s",
+                (password_hash, u),
+            )
+            return
+        with self._sqlite() as conn:
+            conn.execute(
+                "UPDATE users SET password_hash = ? WHERE username = ?",
+                (password_hash, u),
+            )
+
+    def save_password_reset_token(
+        self,
+        username: str,
+        selector: str,
+        token_hash: str,
+        expires_at: str,
+    ) -> None:
+        u = _safe_username(username)
+        if not u:
+            raise ValueError("유효하지 않은 사용자 이름입니다.")
+        created_at = datetime.now(timezone.utc).isoformat()
+        if self._postgres:
+            try:
+                with self._pg_cursor() as cur:
+                    cur.execute(
+                        "DELETE FROM password_reset_tokens WHERE username = %s OR expires_at < NOW()",
+                        (u,),
+                    )
+                    cur.execute(
+                        """
+                        INSERT INTO password_reset_tokens
+                        (token_selector, token_hash, username, expires_at, used_at, created_at)
+                        VALUES (%s, %s, %s, %s, NULL, %s)
+                        """,
+                        (selector, token_hash, u, expires_at, created_at),
+                    )
+                self._pg_commit()
+            except Exception:
+                self._pg_rollback()
+                raise
+            return
+
+        with self._sqlite() as conn:
+            conn.execute(
+                """
+                DELETE FROM password_reset_tokens
+                WHERE username = ? OR expires_at < ?
+                """,
+                (u, created_at),
+            )
+            conn.execute(
+                """
+                INSERT INTO password_reset_tokens
+                (token_selector, token_hash, username, expires_at, used_at, created_at)
+                VALUES (?, ?, ?, ?, NULL, ?)
+                """,
+                (selector, token_hash, u, expires_at, created_at),
+            )
+
+    def get_password_reset_token(self, selector: str) -> dict | None:
+        if not selector:
+            return None
+        if self._postgres:
+            try:
+                with self._pg_cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT token_selector, token_hash, username, expires_at, used_at, created_at
+                        FROM password_reset_tokens
+                        WHERE token_selector = %s
+                        LIMIT 1
+                        """,
+                        (selector,),
+                    )
+                    row = cur.fetchone()
+                    if not row:
+                        return None
+                    return {
+                        "token_selector": row[0],
+                        "token_hash": row[1],
+                        "username": row[2],
+                        "expires_at": str(row[3]),
+                        "used_at": str(row[4]) if row[4] else None,
+                        "created_at": str(row[5]),
+                    }
+            except Exception as exc:
+                logger.error("get_password_reset_token 오류: %s", exc)
+                self._pg_rollback()
+                raise
+
+        with self._sqlite() as conn:
+            row = conn.execute(
+                """
+                SELECT token_selector, token_hash, username, expires_at, used_at, created_at
+                FROM password_reset_tokens
+                WHERE token_selector = ?
+                LIMIT 1
+                """,
+                (selector,),
+            ).fetchone()
+            return dict(row) if row else None
+
+    def mark_password_reset_token_used(self, selector: str) -> None:
+        if not selector:
+            return
+        now = datetime.now(timezone.utc).isoformat()
+        if self._postgres:
+            self._pg_run(
+                "UPDATE password_reset_tokens SET used_at = %s WHERE token_selector = %s",
+                (now, selector),
+            )
+            return
+        with self._sqlite() as conn:
+            conn.execute(
+                "UPDATE password_reset_tokens SET used_at = ? WHERE token_selector = ?",
+                (now, selector),
+            )
+
+    def delete_password_reset_tokens_for_user(self, username: str) -> None:
+        u = _safe_username(username)
+        if not u:
+            return
+        if self._postgres:
+            self._pg_run(
+                "DELETE FROM password_reset_tokens WHERE username = %s",
+                (u,),
+            )
+            return
+        with self._sqlite() as conn:
+            conn.execute(
+                "DELETE FROM password_reset_tokens WHERE username = ?",
+                (u,),
+            )
 
     def get_embedding(self, username: str) -> np.ndarray | None:
         u = _safe_username(username)

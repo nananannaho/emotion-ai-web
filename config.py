@@ -19,6 +19,12 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "emotion-ai-club-dev-key-change-in-pro
 MAX_CONTENT_LENGTH = 8 * 1024 * 1024
 ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "secret").strip()
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "qkrwlgns@@1.").strip()
+SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com").strip()
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USERNAME = os.environ.get("SMTP_USERNAME", "").strip()
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "").strip()
+MAIL_FROM = os.environ.get("MAIL_FROM", SMTP_USERNAME).strip()
+PASSWORD_RESET_TTL_MINUTES = int(os.environ.get("PASSWORD_RESET_TTL_MINUTES", "45"))
 
 USE_LIGHT_ML = os.environ.get("USE_LIGHT_ML", "").lower() in ("1", "true", "yes")
 IS_CLOUD = bool(os.environ.get("RENDER") or os.environ.get("RAILWAY_ENVIRONMENT"))
