@@ -850,6 +850,66 @@ body {
   margin-bottom: 0;
 }
 
+.manual-emotion-picker {
+  margin-bottom: 0.8rem;
+  padding: 0.75rem 0.85rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(158, 206, 232, 0.14);
+  border-radius: 12px;
+}
+
+.manual-emotion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.55rem;
+}
+
+.manual-emotion-header strong {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.manual-emotion-clear {
+  border: 0;
+  background: transparent;
+  color: var(--accent-light);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+.manual-emotion-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.emotion-choice-btn {
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 0.45rem 0.72rem;
+  font: inherit;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.emotion-choice-btn:hover {
+  color: var(--text);
+  border-color: rgba(158, 206, 232, 0.28);
+}
+
+.emotion-choice-btn.active {
+  color: #fff;
+  background: linear-gradient(135deg, rgba(67, 100, 247, 0.45), rgba(110, 180, 212, 0.35));
+  border-color: rgba(158, 206, 232, 0.35);
+}
+
 .chat-emotion-badge {
   display: inline-flex;
   align-items: center;
@@ -1008,6 +1068,9 @@ body {
   min-height: 44px;
   max-height: 120px;
   resize: none;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   padding: 0.7rem 0.9rem;
   background: rgba(0, 0, 0, 0.28);
   border: 1px solid var(--border);
@@ -1021,6 +1084,10 @@ body {
 .chat-form textarea:focus {
   outline: none;
   border-color: var(--primary);
+}
+
+.chat-form textarea::-webkit-scrollbar {
+  display: none;
 }
 
 .chat-form-actions {
@@ -1392,6 +1459,11 @@ body.nav-drawer-open {
 
   .chat-form-actions .btn {
     min-height: 48px;
+  }
+
+  .manual-emotion-header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .emotion-main {

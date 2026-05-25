@@ -20,10 +20,12 @@
   };
 
   const BOT_AVATAR = "🤖";
+  const DEFAULT_SITUATION = "general_support";
 
   let lastFusion = { fused_emotion: "neutral", situation: "general_support" };
   let lastAnalyzeAt = 0;
   let statusTimer = null;
+  let manualEmotion = null;
 
   function scrollChatToBottom() {
     const box = document.getElementById("chatMessages");
@@ -61,7 +63,40 @@
     badge.hidden = false;
   }
 
-  function updateLiveChip(visual, fusion) {
+  function syncManualEmotionUi() {
+    document.querySelectorAll(".emotion-choice-btn").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.emotion === manualEmotion);
+    });
+    const clearBtn = document.getElementById("clearEmotionChoiceBtn");
+    if (clearBtn) clearBtn.hidden = !manualEmotion;
+  }
+
+  function applyEmotionChoice(emotion, source = "manual") {
+    const chosen = emotion || "neutral";
+    lastFusion = {
+      ...lastFusion,
+      fused_emotion: chosen,
+      situation: lastFusion.situation || DEFAULT_SITUATION,
+    };
+    updateChatEmotionBadge(chosen, EMOTION_KO[chosen] || "평온");
+    if (source === "manual") {
+      manualEmotion = chosen;
+      syncManualEmotionUi();
+      setStatus(`${EMOTION_EMOJI[chosen] || ""} ${EMOTION_KO[chosen] || "평온"} 기분으로 챗봇에 반영할게요.`);
+    }
+  }
+
+  function clearManualEmotion() {
+    manualEmotion = null;
+    syncManualEmotionUi();
+    updateChatEmotionBadge(
+      lastFusion.fused_emotion,
+      EMOTION_KO[lastFusion.fused_emotion] || "평온"
+    );
+    setStatus("자동 표정 분석 결과를 다시 사용합니다.");
+  }
+
+  function updateLiveChip(visual, fusion, shouldShow = true) {
     const chip = document.getElementById("liveEmotionChip");
     const emojiEl = document.getElementById("liveEmotionEmoji");
     const label = document.getElementById("liveEmotionLabel");
@@ -79,11 +114,15 @@
     if (emojiEl) emojiEl.textContent = EMOTION_EMOJI[emo] || "";
     label.textContent = emoKo;
     conf.textContent = `${Math.round(confVal * 100)}%`;
-    chip.hidden = false;
-    chip.classList.add("chip-flash");
-    setTimeout(() => chip.classList.remove("chip-flash"), 600);
+    chip.hidden = !shouldShow;
+    if (shouldShow) {
+      chip.classList.add("chip-flash");
+      setTimeout(() => chip.classList.remove("chip-flash"), 600);
+    }
 
-    updateChatEmotionBadge(emo, emoKo);
+    if (!manualEmotion) {
+      updateChatEmotionBadge(emo, emoKo);
+    }
   }
 
   function hideLiveChip() {
@@ -160,7 +199,8 @@
     }, 2500);
   }
 
-  function applyEmotionResult(data) {
+  function applyEmotionResult(data, options = {}) {
+    const { revealChip = true } = options;
     const visual = data.visual;
     const fusion = data.fusion;
     lastFusion = {
@@ -168,17 +208,23 @@
       situation: fusion.situation,
     };
     lastAnalyzeAt = Date.now();
-    updateLiveChip(visual, fusion);
+    updateLiveChip(visual, fusion, revealChip);
     showFaceBox(visual.face_box);
     const label =
       fusion.fused_emotion_ko ||
       visual.emotion_ko ||
       EMOTION_KO[fusion.fused_emotion];
     const em = EMOTION_EMOJI[fusion.fused_emotion] || "";
-    setStatus(`표정 분석: ${em} ${label} (챗봇에 반영됨)`);
+    if (manualEmotion) {
+      updateChatEmotionBadge(manualEmotion, EMOTION_KO[manualEmotion] || "평온");
+      setStatus(`표정은 ${em} ${label}로 읽혔어요. 현재는 직접 고른 기분이 우선 적용됩니다.`);
+    } else {
+      setStatus(`표정 분석: ${em} ${label} (챗봇에 반영됨)`);
+    }
   }
 
-  async function runEmotionAnalyze(silent = false) {
+  async function runEmotionAnalyze(options = {}) {
+    const { silent = false, revealChip = true } = options;
     const btn = document.getElementById("analyzeBtn");
     const syncBtn = document.getElementById("syncEmotionBtn");
     if (btn) {
@@ -208,7 +254,7 @@
         setStatus(data.error || "얼굴을 찾지 못했습니다. 정면을 바라봐 주세요.", true);
         return false;
       }
-      applyEmotionResult(data);
+      applyEmotionResult(data, { revealChip });
       return true;
     } catch (err) {
       hideLiveChip();
@@ -223,8 +269,22 @@
     }
   }
 
-  document.getElementById("analyzeBtn")?.addEventListener("click", () => runEmotionAnalyze(false));
-  document.getElementById("syncEmotionBtn")?.addEventListener("click", () => runEmotionAnalyze(false));
+  document.getElementById("analyzeBtn")?.addEventListener("click", () => {
+    runEmotionAnalyze({ silent: false, revealChip: true });
+  });
+  document.getElementById("syncEmotionBtn")?.addEventListener("click", () => {
+    runEmotionAnalyze({ silent: false, revealChip: false });
+  });
+
+  document.querySelectorAll(".emotion-choice-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      applyEmotionChoice(btn.dataset.emotion, "manual");
+    });
+  });
+
+  document.getElementById("clearEmotionChoiceBtn")?.addEventListener("click", () => {
+    clearManualEmotion();
+  });
 
   document.getElementById("refaceBtn")?.addEventListener("click", async () => {
     setStatus("얼굴 재등록 중…");
@@ -304,13 +364,14 @@
     showTyping(true);
 
     if (Date.now() - lastAnalyzeAt > 45000) {
-      await runEmotionAnalyze(true);
+      await runEmotionAnalyze({ silent: true, revealChip: false });
     }
 
     try {
+      const activeEmotion = manualEmotion || lastFusion.fused_emotion;
       const data = await postJson("/api/chat", {
         message: text,
-        fused_emotion: lastFusion.fused_emotion,
+        fused_emotion: activeEmotion,
         situation: lastFusion.situation,
       });
       showTyping(false);
@@ -383,6 +444,7 @@
     hideLiveChip();
     setStatus("");
     updateChatEmotionBadge("neutral", "평온");
+    syncManualEmotionUi();
     await CameraHelper.init("dashVideo", "dashCanvas");
     CameraHelper.bindGalleryButton(
       "galleryAnalyzeBtn",

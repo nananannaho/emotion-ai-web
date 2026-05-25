@@ -89,6 +89,23 @@
         </div>
       </header>
 
+      <section class="manual-emotion-picker" aria-label="기분 직접 선택">
+        <div class="manual-emotion-header">
+          <strong>기분 직접 선택</strong>
+          <button type="button" id="clearEmotionChoiceBtn" class="manual-emotion-clear" hidden>
+            자동으로 되돌리기
+          </button>
+        </div>
+        <div class="manual-emotion-options">
+          <button type="button" class="emotion-choice-btn" data-emotion="happy">😊 기쁨</button>
+          <button type="button" class="emotion-choice-btn" data-emotion="sad">😢 슬픔</button>
+          <button type="button" class="emotion-choice-btn" data-emotion="angry">😤 분노</button>
+          <button type="button" class="emotion-choice-btn" data-emotion="fear">😰 불안</button>
+          <button type="button" class="emotion-choice-btn" data-emotion="surprise">😲 놀람</button>
+          <button type="button" class="emotion-choice-btn" data-emotion="neutral">😌 평온</button>
+        </div>
+      </section>
+
       <div class="chat-scroll-wrap">
         <div id="chatMessages" class="chat-messages" role="log" aria-live="polite">
           <div class="msg bot">
@@ -127,5 +144,5 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/camera.js') }}"></script>
-<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=11"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=12"></script>
 {% endblock %}
