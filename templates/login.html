@@ -41,10 +41,15 @@
         </label>
         <label>
           <span>비밀번호</span>
-          <input type="password" name="password" required autocomplete="current-password">
+          <div class="password-input-wrap">
+            <input type="password" id="loginPasswordInput" name="password" required autocomplete="current-password">
+            <button type="button" class="password-toggle-btn" aria-label="비밀번호 보기" aria-pressed="false">보기</button>
+          </div>
         </label>
-        <button type="submit" class="btn btn-primary btn-block">로그인</button>
-        <a href="/forgot-password" class="btn btn-ghost btn-block">이메일로 인증번호 받기</a>
+        <div class="auth-action-stack auth-action-stack--spacious">
+          <button type="submit" class="btn btn-primary btn-block">로그인</button>
+          <a href="/forgot-password" class="btn btn-ghost btn-block">이메일로 인증번호 받기</a>
+        </div>
         <p class="auth-footer"><a href="/forgot-password">비밀번호 재설정</a></p>
       </form>
     </div>
@@ -58,7 +63,7 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/api.js') }}"></script>
 <script src="{{ url_for('static', filename='js/camera.js') }}"></script>
-<script src="{{ url_for('static', filename='js/auth.js') }}?v=18"></script>
+<script src="{{ url_for('static', filename='js/auth.js') }}?v=19"></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     CameraHelper.init('loginVideo', 'loginCanvas');

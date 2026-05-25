@@ -34,7 +34,25 @@ const AuthHelper = (() => {
     el.style.color = color;
   }
 
+  function initPasswordToggles(root = document) {
+    root.querySelectorAll(".password-toggle-btn").forEach((btn) => {
+      if (btn.dataset.bound === "true") return;
+      btn.dataset.bound = "true";
+      btn.addEventListener("click", () => {
+        const wrap = btn.closest(".password-input-wrap");
+        const input = wrap?.querySelector("input");
+        if (!input) return;
+        const visible = input.type === "text";
+        input.type = visible ? "password" : "text";
+        btn.textContent = visible ? "보기" : "숨김";
+        btn.setAttribute("aria-label", visible ? "비밀번호 보기" : "비밀번호 숨기기");
+        btn.setAttribute("aria-pressed", visible ? "false" : "true");
+      });
+    });
+  }
+
   function initRegister() {
+    initPasswordToggles();
     const captureBtn = document.getElementById("captureFaceBtn");
     const form = document.getElementById("registerForm");
     const status = document.getElementById("faceStatus");
@@ -189,6 +207,7 @@ const AuthHelper = (() => {
   }
 
   function initLogin() {
+    initPasswordToggles();
     const faceUsernameInput = document.getElementById("faceLoginUsername");
     const passwordUsernameInput = document.querySelector(
       '#passwordLoginForm input[name="username"]'
@@ -281,6 +300,7 @@ const AuthHelper = (() => {
   }
 
   function initForgotPassword() {
+    initPasswordToggles();
     const requestForm = document.getElementById("forgotPasswordForm");
     const codeForm = document.getElementById("resetPasswordByCodeForm");
     const codeBtn = document.getElementById("sendResetCodeBtn");
@@ -444,6 +464,7 @@ const AuthHelper = (() => {
   }
 
   function initResetPassword() {
+    initPasswordToggles();
     const form = document.getElementById("resetPasswordForm");
     if (!form) return;
 
