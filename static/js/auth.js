@@ -94,6 +94,22 @@ const AuthHelper = (() => {
   }
 
   function initLogin() {
+    const faceUsernameInput = document.getElementById("faceLoginUsername");
+    const passwordUsernameInput = document.querySelector(
+      '#passwordLoginForm input[name="username"]'
+    );
+
+    const syncUsername = (source, target) => {
+      source?.addEventListener("input", () => {
+        if (target && !target.value) {
+          target.value = source.value;
+        }
+      });
+    };
+
+    syncUsername(faceUsernameInput, passwordUsernameInput);
+    syncUsername(passwordUsernameInput, faceUsernameInput);
+
     document.querySelectorAll(".tab").forEach((tab) => {
       tab.addEventListener("click", () => {
         document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
@@ -106,9 +122,18 @@ const AuthHelper = (() => {
     document.getElementById("faceLoginBtn")?.addEventListener("click", async () => {
       const status = document.getElementById("loginFaceStatus");
       const btn = document.getElementById("faceLoginBtn");
+      const username = (faceUsernameInput?.value || "").trim();
       showError("loginError", "");
       status.textContent = "얼굴 인식 중... (최대 1분)";
       if (btn) btn.disabled = true;
+
+      if (!username) {
+        showError("loginError", "사용자 이름을 입력해 주세요.");
+        status.textContent = "";
+        if (btn) btn.disabled = false;
+        faceUsernameInput?.focus();
+        return;
+      }
 
       const img = await CameraHelper.captureDataUrl();
       if (!img) {
@@ -119,7 +144,11 @@ const AuthHelper = (() => {
       }
 
       try {
-        const data = await postJson("/api/login/face", { face_image: img }, 120000);
+        const data = await postJson(
+          "/api/login/face",
+          { username, face_image: img },
+          120000
+        );
         if (data.success) {
           status.textContent = `인식 성공 (${(data.match_score * 100).toFixed(0)}%)`;
           window.location.href = "/dashboard";

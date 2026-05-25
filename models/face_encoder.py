@@ -9,11 +9,17 @@ import cv2
 import numpy as np
 
 from config import (
+    FACE_DUPLICATE_THRESHOLD,
+    FACE_DUPLICATE_THRESHOLD_LIGHT,
     FACE_IMG_SIZE,
     FACE_MATCH_MARGIN,
     FACE_MATCH_MARGIN_LIGHT,
     FACE_MATCH_THRESHOLD,
     FACE_MATCH_THRESHOLD_LIGHT,
+    FACE_VERIFY_AVG_THRESHOLD,
+    FACE_VERIFY_AVG_THRESHOLD_LIGHT,
+    FACE_VERIFY_THRESHOLD,
+    FACE_VERIFY_THRESHOLD_LIGHT,
     USE_LIGHT_ML,
     WEIGHTS_DIR,
 )
@@ -219,6 +225,16 @@ class FaceEncoder:
             return FACE_MATCH_THRESHOLD_LIGHT, FACE_MATCH_MARGIN_LIGHT
         return FACE_MATCH_THRESHOLD, FACE_MATCH_MARGIN
 
+    def verify_thresholds(self) -> tuple[float, float]:
+        if USE_LIGHT_ML or not ENCODER_WEIGHTS.exists():
+            return FACE_VERIFY_THRESHOLD_LIGHT, FACE_VERIFY_AVG_THRESHOLD_LIGHT
+        return FACE_VERIFY_THRESHOLD, FACE_VERIFY_AVG_THRESHOLD
+
+    def duplicate_threshold(self) -> float:
+        if USE_LIGHT_ML or not ENCODER_WEIGHTS.exists():
+            return FACE_DUPLICATE_THRESHOLD_LIGHT
+        return FACE_DUPLICATE_THRESHOLD
+
     def _login_embeddings(self, image_bgr: np.ndarray) -> list[np.ndarray]:
         """로그인: 원본 + 좌우반전 중 더 나은 매칭."""
         out: list[np.ndarray] = []
@@ -227,6 +243,41 @@ class FaceEncoder:
             if emb is not None:
                 out.append(emb)
         return out
+
+    def verify_user(
+        self, image_bgr: np.ndarray, stored_embedding: np.ndarray
+    ) -> tuple[bool, float]:
+        currents = self._login_embeddings(image_bgr)
+        if not currents:
+            return False, 0.0
+
+        stored = self.normalize_embedding(stored_embedding)
+        expected = self.expected_embedding_dim()
+        if stored is None or stored.size != expected:
+            raise ValueError("stored_embeddings_incompatible")
+
+        scores = [
+            self.cosine_similarity(cur, stored)
+            for cur in currents
+        ]
+        scores = [score for score in scores if score >= 0]
+        if not scores:
+            return False, 0.0
+
+        best_score = max(scores)
+        avg_score = float(sum(scores) / len(scores))
+        best_threshold, avg_threshold = self.verify_thresholds()
+        if best_score >= best_threshold and (len(scores) == 1 or avg_score >= avg_threshold):
+            return True, best_score
+
+        logger.info(
+            "얼굴 1:1 검증 거부: best=%.3f avg=%.3f (need %.2f / %.2f)",
+            best_score,
+            avg_score,
+            best_threshold,
+            avg_threshold,
+        )
+        return False, best_score
 
     def match_user(
         self, image_bgr: np.ndarray, stored_embeddings: dict[str, np.ndarray]

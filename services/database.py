@@ -401,6 +401,31 @@ class Database:
                 return None
             return dict(row)
 
+    def get_embedding(self, username: str) -> np.ndarray | None:
+        u = _safe_username(username)
+        if not u:
+            return None
+        if self._postgres:
+            try:
+                with self._pg_cursor() as cur:
+                    cur.execute(
+                        "SELECT embedding FROM face_embeddings WHERE username = %s",
+                        (u,),
+                    )
+                    row = cur.fetchone()
+                    return _bytes_to_embedding(row[0]) if row else None
+            except Exception as exc:
+                logger.error("get_embedding 오류: %s", exc)
+                self._pg_rollback()
+                raise
+
+        with self._sqlite() as conn:
+            row = conn.execute(
+                "SELECT embedding FROM face_embeddings WHERE username = ?",
+                (u,),
+            ).fetchone()
+            return _bytes_to_embedding(row["embedding"]) if row else None
+
     def get_all_embeddings(self) -> dict[str, np.ndarray]:
         result = {}
         if self._postgres:

@@ -22,6 +22,26 @@ class AuthService:
     def user_exists(self, username: str) -> bool:
         return self.db.user_exists(username)
 
+    def _find_face_conflict(
+        self,
+        embedding,
+        *,
+        exclude_username: str | None = None,
+    ) -> tuple[str, float] | None:
+        embeddings = self.db.get_all_embeddings()
+        probe = self.encoder.normalize_embedding(embedding)
+        if probe is None:
+            return None
+
+        threshold = self.encoder.duplicate_threshold()
+        for username, stored in embeddings.items():
+            if exclude_username and username == exclude_username:
+                continue
+            score = self.encoder.cosine_similarity(probe, stored)
+            if score >= threshold:
+                return username, score
+        return None
+
     def register(
         self,
         username: str,
@@ -51,6 +71,16 @@ class AuthService:
             return {"success": False, "error": "얼굴 처리 중 오류가 발생했습니다. 사진을 다시 선택해 주세요."}
         if embedding is None:
             return {"success": False, "error": "얼굴을 인식하지 못했습니다. 다시 촬영해 주세요."}
+        try:
+            conflict = self._find_face_conflict(embedding)
+        except Exception as exc:
+            logger.exception("가입 전 얼굴 중복 검사 실패: %s", exc)
+            return {"success": False, "error": "가입 검증 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."}
+        if conflict:
+            return {
+                "success": False,
+                "error": "이미 다른 계정에 등록된 얼굴입니다. 다른 얼굴 사진으로 가입해 주세요.",
+            }
 
         prefs = preferences or {
             "preferred_tone": "neutral",
@@ -86,28 +116,35 @@ class AuthService:
             return {"success": False, "error": "비밀번호가 올바르지 않습니다."}
         return {"success": True, "profile": self.public_profile(profile)}
 
-    def login_face(self, face_image_bgr) -> dict:
+    def login_face(self, username: str, face_image_bgr) -> dict:
+        username = (username or "").strip()
+        if not username:
+            return {"success": False, "error": "사용자 이름을 입력해 주세요."}
+
         try:
-            embeddings = self.db.get_all_embeddings()
+            profile = self.db.get_user_full(username)
+            stored_embedding = self.db.get_embedding(username)
         except Exception as exc:
-            logger.exception("얼굴 DB 조회 실패: %s", exc)
+            logger.exception("얼굴 로그인 사용자 조회 실패: %s", exc)
             return {
                 "success": False,
                 "error": "데이터베이스 연결 오류입니다. 잠시 후 다시 시도해 주세요.",
             }
 
-        if not embeddings:
-            return {"success": False, "error": "등록된 얼굴 데이터가 없습니다."}
+        if not profile:
+            return {"success": False, "error": "사용자를 찾을 수 없습니다."}
+        if stored_embedding is None:
+            return {"success": False, "error": "이 계정에는 등록된 얼굴 데이터가 없습니다."}
 
         try:
-            user, score = self.encoder.match_user(face_image_bgr, embeddings)
+            matched, score = self.encoder.verify_user(face_image_bgr, stored_embedding)
         except ValueError as exc:
             if str(exc) == "stored_embeddings_incompatible":
                 return {
                     "success": False,
                     "error": (
                         "저장된 얼굴 데이터 형식이 맞지 않습니다. "
-                        "비밀번호로 로그인한 뒤 대시보드에서 「얼굴 재등록」을 해 주세요."
+                        "비밀번호로 로그인한 뒤 얼굴을 다시 등록해 주세요."
                     ),
                 }
             logger.exception("얼굴 매칭 값 오류: %s", exc)
@@ -122,7 +159,7 @@ class AuthService:
                 "error": "얼굴 인식 처리 중 오류가 발생했습니다. 사진을 다시 선택해 주세요.",
             }
 
-        if user is None and score <= 0.0:
+        if not matched and score <= 0.0:
             probe = self.encoder.encode(face_image_bgr, allow_center_fallback=True)
             if probe is None:
                 return {
@@ -133,9 +170,9 @@ class AuthService:
                     ),
                 }
 
-        if user is None:
+        if not matched:
             hint = (
-                f"등록된 얼굴과 일치하지 않습니다. (유사도 {round(score * 100)}%) "
+                f"이 계정에 등록된 얼굴과 일치하지 않습니다. (유사도 {round(score * 100)}%) "
                 "가입할 때와 같이 정면·밝은 곳에서 다시 시도하거나 '사진 촬영/선택'을 이용해 주세요."
             )
             return {
@@ -143,10 +180,6 @@ class AuthService:
                 "error": hint,
                 "match_score": round(score, 3),
             }
-
-        profile = self.db.get_user_full(user)
-        if not profile:
-            return {"success": False, "error": "사용자 정보를 찾을 수 없습니다."}
 
         return {
             "success": True,
@@ -198,6 +231,16 @@ class AuthService:
             return {"success": False, "error": "얼굴 처리 중 오류가 발생했습니다."}
         if embedding is None:
             return {"success": False, "error": "얼굴을 인식하지 못했습니다. 정면 사진으로 다시 시도해 주세요."}
+        try:
+            conflict = self._find_face_conflict(embedding, exclude_username=username)
+        except Exception as exc:
+            logger.exception("얼굴 재등록 중복 검사 실패: %s", exc)
+            return {"success": False, "error": "얼굴 검증 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."}
+        if conflict:
+            return {
+                "success": False,
+                "error": "이미 다른 계정에 등록된 얼굴과 너무 비슷합니다. 다른 사진으로 다시 시도해 주세요.",
+            }
         self.db.save_embedding(username, embedding)
         return {"success": True, "message": "얼굴이 새로 등록되었습니다."}
 

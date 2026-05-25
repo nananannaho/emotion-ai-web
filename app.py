@@ -163,7 +163,10 @@ def api_login_face():
         if image is None:
             return jsonify({"success": False, "error": "얼굴 이미지가 필요합니다."}), 400
 
-        result = auth_service.login_face(image)
+        result = auth_service.login_face(
+            username=(data.get("username") or "").strip(),
+            face_image_bgr=image,
+        )
         if result.get("success"):
             session["user"] = result["profile"]["username"]
         status = 200 if result.get("success") else 401
