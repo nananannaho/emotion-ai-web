@@ -127,6 +127,12 @@
 
   function hideLiveChip() {
     const chip = document.getElementById("liveEmotionChip");
+    const emojiEl = document.getElementById("liveEmotionEmoji");
+    const label = document.getElementById("liveEmotionLabel");
+    const conf = document.getElementById("liveEmotionConf");
+    if (emojiEl) emojiEl.textContent = "";
+    if (label) label.textContent = "";
+    if (conf) conf.textContent = "";
     if (chip) chip.hidden = true;
   }
 
@@ -227,6 +233,7 @@
     const { silent = false, revealChip = true } = options;
     const btn = document.getElementById("analyzeBtn");
     const syncBtn = document.getElementById("syncEmotionBtn");
+    hideLiveChip();
     if (btn) {
       btn.disabled = true;
       btn.textContent = "분석 중…";

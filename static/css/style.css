@@ -700,6 +700,10 @@ body {
   width: fit-content;
 }
 
+.live-emotion-chip[hidden] {
+  display: none !important;
+}
+
 .emotion-result-compact {
   margin-top: 0.75rem;
 }
