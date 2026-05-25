@@ -74,7 +74,7 @@ def health():
         "emotion_ml": (WEIGHTS_DIR / "emotion_clf.joblib").exists(),
         "database": db.backend,
         "database_url_set": bool(DATABASE_URL),
-        "api_version": 11,
+        "api_version": 12,
     })
 
 
@@ -167,6 +167,49 @@ def admin_page():
         users=users,
         total_users=len(users),
     )
+
+
+@app.post("/api/register/email-code/request")
+def api_register_email_code_request():
+    if not mail_service.configured:
+        return jsonify({
+            "success": False,
+            "error": "이메일 인증 기능이 아직 설정되지 않았습니다.",
+        }), 503
+
+    data = request.get_json(silent=True) or {}
+    result = auth_service.request_signup_email_verification(data.get("email") or "")
+    if not result.get("success"):
+        return jsonify(result), 400
+
+    try:
+        if result.get("email_sent"):
+            mail_service.send_signup_verification_email(
+                to_email=result["email"],
+                verification_code=result["verification_code"],
+            )
+    except Exception as exc:
+        logger.exception("회원가입 이메일 인증 메일 발송 실패: %s", exc)
+        return jsonify({
+            "success": False,
+            "error": "이메일 인증번호를 보내지 못했습니다. 잠시 후 다시 시도해 주세요.",
+        }), 500
+
+    return jsonify({
+        "success": True,
+        "message": "입력한 이메일로 인증번호를 보냈습니다.",
+    })
+
+
+@app.post("/api/register/email-code/verify")
+def api_register_email_code_verify():
+    data = request.get_json(silent=True) or {}
+    result = auth_service.verify_signup_email_code(
+        data.get("email") or "",
+        data.get("code") or "",
+    )
+    status = 200 if result.get("success") else 400
+    return jsonify(result), status
 
 
 @app.post("/api/register")

@@ -196,6 +196,19 @@ class Database:
                     WHERE email IS NOT NULL AND email <> ''
                     """
                 )
+                self._pg_run(
+                    """
+                    CREATE TABLE IF NOT EXISTS email_verification_tokens (
+                        email VARCHAR(255) NOT NULL,
+                        purpose VARCHAR(64) NOT NULL,
+                        code_hash TEXT NOT NULL,
+                        expires_at TIMESTAMPTZ NOT NULL,
+                        verified_at TIMESTAMPTZ NULL,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        PRIMARY KEY (email, purpose)
+                    )
+                    """
+                )
                 return
             except Exception as exc:
                 logger.error("PostgreSQL 스키마 생성 실패, SQLite로 전환: %s", exc)
@@ -227,6 +240,15 @@ class Database:
                     used_at TEXT,
                     created_at TEXT NOT NULL,
                     FOREIGN KEY (username) REFERENCES users(username) ON DELETE CASCADE
+                );
+                CREATE TABLE IF NOT EXISTS email_verification_tokens (
+                    email TEXT NOT NULL,
+                    purpose TEXT NOT NULL,
+                    code_hash TEXT NOT NULL,
+                    expires_at TEXT NOT NULL,
+                    verified_at TEXT,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (email, purpose)
                 );
                 """
             )
@@ -718,6 +740,159 @@ class Database:
                 "DELETE FROM password_reset_tokens WHERE username = ?",
                 (u,),
             )
+
+    def save_email_verification_token(
+        self,
+        email: str,
+        purpose: str,
+        code_hash: str,
+        expires_at: str,
+    ) -> None:
+        target = (email or "").strip().lower()
+        token_purpose = (purpose or "").strip().lower()
+        if not target or not token_purpose:
+            raise ValueError("이메일 인증 정보가 올바르지 않습니다.")
+        created_at = datetime.now(timezone.utc).isoformat()
+        if self._postgres:
+            try:
+                with self._pg_cursor() as cur:
+                    cur.execute(
+                        """
+                        DELETE FROM email_verification_tokens
+                        WHERE (email = %s AND purpose = %s) OR expires_at < NOW()
+                        """,
+                        (target, token_purpose),
+                    )
+                    cur.execute(
+                        """
+                        INSERT INTO email_verification_tokens
+                        (email, purpose, code_hash, expires_at, verified_at, created_at)
+                        VALUES (%s, %s, %s, %s, NULL, %s)
+                        """,
+                        (target, token_purpose, code_hash, expires_at, created_at),
+                    )
+                self._pg_commit()
+            except Exception:
+                self._pg_rollback()
+                raise
+            return
+
+        with self._sqlite() as conn:
+            conn.execute(
+                """
+                DELETE FROM email_verification_tokens
+                WHERE (email = ? AND purpose = ?) OR expires_at < ?
+                """,
+                (target, token_purpose, created_at),
+            )
+            conn.execute(
+                """
+                INSERT INTO email_verification_tokens
+                (email, purpose, code_hash, expires_at, verified_at, created_at)
+                VALUES (?, ?, ?, ?, NULL, ?)
+                """,
+                (target, token_purpose, code_hash, expires_at, created_at),
+            )
+
+    def get_email_verification_token(self, email: str, purpose: str) -> dict | None:
+        target = (email or "").strip().lower()
+        token_purpose = (purpose or "").strip().lower()
+        if not target or not token_purpose:
+            return None
+        if self._postgres:
+            try:
+                with self._pg_cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT email, purpose, code_hash, expires_at, verified_at, created_at
+                        FROM email_verification_tokens
+                        WHERE email = %s AND purpose = %s
+                        LIMIT 1
+                        """,
+                        (target, token_purpose),
+                    )
+                    row = cur.fetchone()
+                    if not row:
+                        return None
+                    return {
+                        "email": row[0],
+                        "purpose": row[1],
+                        "code_hash": row[2],
+                        "expires_at": str(row[3]),
+                        "verified_at": str(row[4]) if row[4] else None,
+                        "created_at": str(row[5]),
+                    }
+            except Exception as exc:
+                logger.error("get_email_verification_token 오류: %s", exc)
+                self._pg_rollback()
+                raise
+
+        with self._sqlite() as conn:
+            row = conn.execute(
+                """
+                SELECT email, purpose, code_hash, expires_at, verified_at, created_at
+                FROM email_verification_tokens
+                WHERE email = ? AND purpose = ?
+                LIMIT 1
+                """,
+                (target, token_purpose),
+            ).fetchone()
+            return dict(row) if row else None
+
+    def mark_email_verification_verified(self, email: str, purpose: str) -> None:
+        target = (email or "").strip().lower()
+        token_purpose = (purpose or "").strip().lower()
+        if not target or not token_purpose:
+            return
+        now = datetime.now(timezone.utc).isoformat()
+        if self._postgres:
+            self._pg_run(
+                """
+                UPDATE email_verification_tokens
+                SET verified_at = %s
+                WHERE email = %s AND purpose = %s
+                """,
+                (now, target, token_purpose),
+            )
+            return
+        with self._sqlite() as conn:
+            conn.execute(
+                """
+                UPDATE email_verification_tokens
+                SET verified_at = ?
+                WHERE email = ? AND purpose = ?
+                """,
+                (now, target, token_purpose),
+            )
+
+    def delete_email_verification_tokens(self, email: str, purpose: str | None = None) -> None:
+        target = (email or "").strip().lower()
+        token_purpose = (purpose or "").strip().lower()
+        if not target:
+            return
+        if self._postgres:
+            if token_purpose:
+                self._pg_run(
+                    "DELETE FROM email_verification_tokens WHERE email = %s AND purpose = %s",
+                    (target, token_purpose),
+                )
+            else:
+                self._pg_run(
+                    "DELETE FROM email_verification_tokens WHERE email = %s",
+                    (target,),
+                )
+            return
+        with self._sqlite() as conn:
+            if token_purpose:
+                conn.execute(
+                    "DELETE FROM email_verification_tokens WHERE email = ? AND purpose = ?",
+                    (target, token_purpose),
+                )
+            else:
+                conn.execute(
+                    "DELETE FROM email_verification_tokens WHERE email = ?",
+                    (target,),
+                )
 
     def get_embedding(self, username: str) -> np.ndarray | None:
         u = _safe_username(username)

@@ -16,6 +16,41 @@ class MailService:
     def configured(self) -> bool:
         return bool(SMTP_HOST and SMTP_PORT and SMTP_USERNAME and SMTP_PASSWORD and MAIL_FROM)
 
+    def _send_message(self, msg: EmailMessage) -> None:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as smtp:
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.ehlo()
+            smtp.login(SMTP_USERNAME, SMTP_PASSWORD)
+            smtp.send_message(msg)
+
+    def send_signup_verification_email(
+        self,
+        *,
+        to_email: str,
+        verification_code: str,
+    ) -> None:
+        if not self.configured:
+            raise RuntimeError("smtp_not_configured")
+
+        msg = EmailMessage()
+        msg["Subject"] = "[Felunai] 회원가입 이메일 인증번호"
+        msg["From"] = MAIL_FROM
+        msg["To"] = to_email
+        msg.set_content(
+            "\n".join([
+                "Felunai 회원가입 이메일 인증 요청이 접수되었습니다.",
+                "",
+                f"인증번호: {verification_code}",
+                "",
+                "회원가입 화면에서 위 인증번호를 입력해 인증을 완료해 주세요.",
+                "본인이 요청하지 않았다면 이 메일을 무시해 주세요.",
+            ])
+        )
+
+        self._send_message(msg)
+        logger.info("회원가입 이메일 인증 메일 발송 완료: %s", to_email)
+
     def send_password_reset_email(
         self,
         *,
@@ -47,11 +82,5 @@ class MailService:
             ])
         )
 
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as smtp:
-            smtp.ehlo()
-            smtp.starttls()
-            smtp.ehlo()
-            smtp.login(SMTP_USERNAME, SMTP_PASSWORD)
-            smtp.send_message(msg)
-
+        self._send_message(msg)
         logger.info("비밀번호 재설정 메일 발송 완료: %s", to_email)
