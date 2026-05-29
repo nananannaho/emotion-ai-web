@@ -32,6 +32,10 @@ MAIL_FROM = os.environ.get(
 EMAIL_VERIFICATION_TTL_MINUTES = int(os.environ.get("EMAIL_VERIFICATION_TTL_MINUTES", "10"))
 PASSWORD_RESET_TTL_MINUTES = int(os.environ.get("PASSWORD_RESET_TTL_MINUTES", "45"))
 
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash").strip() or "gemini-2.0-flash"
+GEMINI_TIMEOUT_SECONDS = int(os.environ.get("GEMINI_TIMEOUT_SECONDS", "45"))
+
 USE_LIGHT_ML = os.environ.get("USE_LIGHT_ML", "").lower() in ("1", "true", "yes")
 IS_CLOUD = bool(os.environ.get("RENDER") or os.environ.get("RAILWAY_ENVIRONMENT"))
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()

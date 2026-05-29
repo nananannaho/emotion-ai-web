@@ -11,7 +11,7 @@ import sys
 from flask import Flask, Response, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from config import ADMIN_USERNAME, DATABASE_URL, IS_CLOUD, SECRET_KEY, USE_LIGHT_ML
+from config import ADMIN_USERNAME, DATABASE_URL, GEMINI_API_KEY, IS_CLOUD, SECRET_KEY, USE_LIGHT_ML
 from services.database import get_db
 from services.auth_service import AuthService
 from services.chatbot_service import ChatbotService
@@ -74,7 +74,8 @@ def health():
         "emotion_ml": (WEIGHTS_DIR / "emotion_clf.joblib").exists(),
         "database": db.backend,
         "database_url_set": bool(DATABASE_URL),
-        "api_version": 14,
+        "api_version": 15,
+        "chatbot_engine": "gemini" if GEMINI_API_KEY else "local",
     })
 
 
