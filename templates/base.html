@@ -31,7 +31,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=19">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20">
   <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -80,6 +80,9 @@
 
   <footer class="footer">
     <p>Felunai · 표정 기반 감정 대화 플랫폼</p>
+    {% if felunai_contact_email %}
+    <p class="footer-contact"><a href="mailto:{{ felunai_contact_email }}">{{ felunai_contact_email }}</a></p>
+    {% endif %}
   </footer>
 
   <div id="guideModal" class="guide-modal" hidden aria-hidden="true">

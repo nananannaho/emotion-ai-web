@@ -11,7 +11,15 @@ import sys
 from flask import Flask, Response, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from config import ADMIN_USERNAME, DATABASE_URL, GEMINI_API_KEY, IS_CLOUD, SECRET_KEY, USE_LIGHT_ML
+from config import (
+    ADMIN_USERNAME,
+    DATABASE_URL,
+    FELUNAI_CONTACT_EMAIL,
+    GEMINI_API_KEY,
+    IS_CLOUD,
+    SECRET_KEY,
+    USE_LIGHT_ML,
+)
 from services.database import get_db
 from services.auth_service import AuthService
 from services.chatbot_service import ChatbotService
@@ -53,6 +61,7 @@ def inject_globals():
         "use_light_ml": USE_LIGHT_ML,
         "logged_in": bool(session.get("user")),
         "is_admin": bool(session.get("is_admin")),
+        "felunai_contact_email": FELUNAI_CONTACT_EMAIL,
     }
 
 

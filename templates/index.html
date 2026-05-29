@@ -15,21 +15,28 @@
   </div>
 </section>
 
-<section class="features">
-  <article class="feature-card">
-    <div class="feature-icon">👤</div>
-    <h3>얼굴 로그인</h3>
-    <p>가입 시 등록한 얼굴로 빠르고 안정적으로 접속할 수 있습니다.</p>
-  </article>
-  <article class="feature-card">
-    <div class="feature-icon">🎭</div>
-    <h3>7가지 감정 분석</h3>
-    <p>기쁨, 슬픔, 분노 등 주요 감정을 읽어 현재 상태를 자연스럽게 반영합니다.</p>
-  </article>
-  <article class="feature-card">
-    <div class="feature-icon">💬</div>
-    <h3>감정 기반 대화</h3>
-    <p>분석된 감정을 토대로 더 부드럽고 맥락 있는 대화를 이어갈 수 있습니다.</p>
-  </article>
+<section class="home-contact" aria-labelledby="home-contact-heading">
+  <h2 id="home-contact-heading" class="home-contact-title">문의</h2>
+  <p class="home-contact-lead">
+    서비스 이용, 계정, 오류 신고, 제안·협업 문의는 아래 이메일로 보내 주세요.
+  </p>
+
+  <div class="home-contact-card">
+    <p class="home-contact-label">Felunai 공식 이메일</p>
+    <a href="mailto:{{ felunai_contact_email }}" class="home-contact-email">{{ felunai_contact_email }}</a>
+    <a href="mailto:{{ felunai_contact_email }}" class="btn btn-primary touch-btn home-contact-btn">이메일로 문의하기</a>
+
+    <ul class="home-contact-topics">
+      <li>회원가입 · 로그인 · 비밀번호 재설정</li>
+      <li>감정 분석 · 챗봇 이용 관련</li>
+      <li>서비스 오류 및 개선 제안</li>
+      <li>협업 · 데모 · 기타 문의</li>
+    </ul>
+
+    <p class="home-contact-note">
+      제목에 <strong>「Felunai 문의」</strong>와 사용 중인 아이디(또는 가입 이메일)를 적어 주시면 더 빠르게 도와드릴 수 있습니다.<br>
+      평일 기준 1~3영업일 내 답변을 드리려 노력합니다.
+    </p>
+  </div>
 </section>
 {% endblock %}
