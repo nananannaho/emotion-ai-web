@@ -45,6 +45,7 @@
         <thead>
           <tr>
             <th>아이디</th>
+            <th>가입 이메일</th>
             <th>표시 이름</th>
             <th>가입 시각</th>
             <th>감정 기록 수</th>
@@ -56,6 +57,7 @@
           {% for user_item in users %}
           <tr>
             <td>{{ user_item.username }}</td>
+            <td class="admin-user-email">{% if user_item.email %}{{ user_item.email }}{% else %}<span class="admin-user-muted">미등록</span>{% endif %}</td>
             <td>{{ user_item.display_name }}</td>
             <td>{{ user_item.created_at }}</td>
             <td>{{ user_item.mood_count }}</td>

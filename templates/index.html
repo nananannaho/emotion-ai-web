@@ -25,11 +25,14 @@
     <p class="home-contact-label">Felunai 공식 이메일</p>
     {% set mail_subject = "Felunai 문의" %}
     {% set mail_body = "안녕하세요, Felunai 문의드립니다.\n\n[문의 내용을 적어 주세요]\n\n아이디(또는 가입 이메일): \n" %}
+    {% set mail_href = "mailto:" ~ felunai_contact_email ~ "?subject=" ~ (mail_subject | urlencode) ~ "&body=" ~ (mail_body | urlencode) %}
+    <span class="home-contact-email home-contact-email--static">{{ felunai_contact_email }}</span>
     <a
-      href="mailto:{{ felunai_contact_email }}?subject={{ mail_subject | urlencode }}&body={{ mail_body | urlencode }}"
-      class="home-contact-email touch-btn"
+      href="{{ mail_href }}"
+      class="home-contact-email home-contact-email--link touch-btn"
     >{{ felunai_contact_email }}</a>
-    <p class="home-contact-hint">주소를 누르면 메일 앱이 열리고, 제목·본문이 자동으로 채워집니다.</p>
+    <p class="home-contact-hint home-contact-hint--desktop">PC에서는 주소만 표시됩니다. 메일 앱에서 직접 보내 주세요.</p>
+    <p class="home-contact-hint home-contact-hint--mobile">주소를 누르면 메일 앱이 열리고, 제목·본문이 자동으로 채워집니다.</p>
 
     <ul class="home-contact-topics">
       <li>회원가입 · 로그인 · 비밀번호 재설정</li>

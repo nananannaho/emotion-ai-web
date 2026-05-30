@@ -950,7 +950,7 @@ class Database:
                 with self._pg_cursor() as cur:
                     cur.execute(
                         """
-                        SELECT username, display_name, created_at, mood_history, chat_history
+                        SELECT username, display_name, email, created_at, mood_history, chat_history
                         FROM users
                         ORDER BY created_at DESC
                         LIMIT %s
@@ -963,12 +963,13 @@ class Database:
                 self._pg_rollback()
                 raise
 
-            for username, display_name, created_at, moods, chats in rows:
+            for username, display_name, email, created_at, moods, chats in rows:
                 mood_history = json.loads(moods) if isinstance(moods, str) else (moods or [])
                 chat_history = json.loads(chats) if isinstance(chats, str) else (chats or [])
                 users.append({
                     "username": username,
                     "display_name": display_name,
+                    "email": (email or "").strip(),
                     "created_at": str(created_at),
                     "mood_count": len(mood_history),
                     "chat_count": len(chat_history),
@@ -978,7 +979,7 @@ class Database:
         with self._sqlite() as conn:
             rows = conn.execute(
                 """
-                SELECT username, display_name, created_at, mood_history, chat_history
+                SELECT username, display_name, email, created_at, mood_history, chat_history
                 FROM users
                 ORDER BY created_at DESC
                 LIMIT ?
@@ -991,6 +992,7 @@ class Database:
                 users.append({
                     "username": row["username"],
                     "display_name": row["display_name"],
+                    "email": (row["email"] or "").strip(),
                     "created_at": row["created_at"],
                     "mood_count": len(mood_history),
                     "chat_count": len(chat_history),
