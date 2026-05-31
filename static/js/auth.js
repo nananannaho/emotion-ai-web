@@ -111,9 +111,8 @@ const AuthHelper = (() => {
       tick();
     }
 
-    sendCodeBtn?.addEventListener("click", async () => {
+    async function requestSignupVerificationEmail(email) {
       showError("registerError", "");
-      const email = normalizeEmail(emailInput?.value);
       if (!email) {
         showError("registerError", "이메일 주소를 먼저 입력해 주세요.");
         emailInput?.focus();
@@ -121,7 +120,7 @@ const AuthHelper = (() => {
       }
       if (signupCodeCooldownTimer) return;
       sendCodeBtn.disabled = true;
-      setStatus("registerEmailStatus", "인증번호를 보내는 중입니다... (최대 1분)");
+      setStatus("registerEmailStatus", "인증번호를 준비 중입니다... (비밀번호 재설정과 동일)");
       try {
         const data = await postJson("/api/register/email-code/request", { email });
         if (data.success) {
@@ -129,7 +128,7 @@ const AuthHelper = (() => {
           setStatus(
             "registerEmailStatus",
             data.message ||
-              "입력한 이메일로 인증번호를 보냈습니다. 스팸함도 확인해 주세요.",
+              "입력한 이메일로 인증번호를 보냈습니다. 비밀번호 재설정 메일과 같은 형식입니다.",
             "#8ec9b0"
           );
           emailCodeInput?.focus();
@@ -144,6 +143,11 @@ const AuthHelper = (() => {
         setStatus("registerEmailStatus", "");
         sendCodeBtn.disabled = false;
       }
+    }
+
+    sendCodeBtn?.addEventListener("click", async () => {
+      const email = normalizeEmail(emailInput?.value);
+      await requestSignupVerificationEmail(email);
     });
 
     verifyCodeBtn?.addEventListener("click", async () => {

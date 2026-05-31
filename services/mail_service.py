@@ -22,6 +22,9 @@ from config import (
 
 logger = logging.getLogger(__name__)
 
+# 비밀번호 재설정 메일과 동일한 제목·템플릿 (수신 안정성)
+VERIFICATION_EMAIL_SUBJECT = "[Felunai] 비밀번호 재설정 링크"
+
 
 class MailService:
     @property
@@ -93,6 +96,15 @@ class MailService:
   </body>
 </html>
 """
+
+    @staticmethod
+    def _verification_code_block_html(verification_code: str) -> str:
+        return (
+            f"<div style=\"margin:0 0 24px;padding:16px 20px;border-radius:18px;"
+            f"background:#151b2b;border:1px solid rgba(151,139,255,0.24);font-size:30px;"
+            f"font-weight:700;letter-spacing:0.32em;text-align:center;color:#b7b1ff;\">"
+            f"{escape(verification_code)}</div>"
+        )
 
     def _send_message_resend(self, *, to_email: str, subject: str, text: str, html: str | None = None) -> None:
         payload = json.dumps({
@@ -181,6 +193,95 @@ class MailService:
             raise RuntimeError(" | ".join(errors))
         raise RuntimeError("mail_not_configured")
 
+    def send_verification_code_email(
+        self,
+        *,
+        to_email: str,
+        display_name: str,
+        verification_code: str,
+        purpose: str,
+        site_url: str | None = None,
+        action_url: str | None = None,
+        action_label: str | None = None,
+    ) -> None:
+        """비밀번호 재설정·회원가입 공통 인증번호 메일 (동일 제목·템플릿)."""
+        if not self.configured:
+            raise RuntimeError("mail_not_configured")
+
+        name = (display_name or "회원").strip() or "회원"
+        code_block = self._verification_code_block_html(verification_code)
+
+        if purpose == "signup":
+            title = "회원가입 이메일 인증"
+            intro = (
+                f"{name}님, 안녕하세요.\n\n"
+                "Felunai 회원가입 이메일 인증 요청이 접수되었습니다.\n"
+                "아래 인증번호를 회원가입 화면에 입력해 주세요.\n"
+            )
+            intro_html = (
+                f"<p style=\"margin:0 0 16px;\">{escape(name)}님, 안녕하세요.</p>"
+                "<p style=\"margin:0 0 16px;\">Felunai 회원가입 이메일 인증 요청이 접수되었습니다. "
+                "아래 인증번호를 회원가입 화면에 입력해 주세요.</p>"
+            )
+            after_code = "본인이 요청하지 않았다면 이 메일을 무시해 주세요."
+            footer_note = "이 메일은 Felunai 회원가입 이메일 인증을 위해 자동 발송되었습니다."
+        else:
+            title = "비밀번호 재설정 안내"
+            intro = (
+                f"{name}님, 안녕하세요.\n\n"
+                "Felunai 비밀번호 재설정 요청이 접수되었습니다.\n"
+            )
+            intro_html = (
+                f"<p style=\"margin:0 0 16px;\">{escape(name)}님, 안녕하세요.</p>"
+                "<p style=\"margin:0 0 16px;\">Felunai 비밀번호 재설정 요청이 접수되었습니다. "
+            )
+            if action_url and action_label:
+                intro += f"아래 링크를 눌러 새 비밀번호를 설정해 주세요.\n\n{action_url}\n\n"
+                intro_html += (
+                    "아래 버튼을 눌러 새 비밀번호를 설정해 주세요.</p>"
+                    f"<div style=\"margin:0 0 24px;\"><a href=\"{escape(action_url)}\" "
+                    "style=\"display:inline-block;padding:14px 22px;border-radius:14px;"
+                    "background:linear-gradient(135deg,#8c84ff,#6a63e6);color:#ffffff;"
+                    f"text-decoration:none;font-weight:700;\">{escape(action_label)}</a></div>"
+                )
+            else:
+                intro_html += "</p>"
+            intro += (
+                f"링크가 열리지 않으면 인증번호 {verification_code} 를 입력해서도 재설정할 수 있습니다.\n\n"
+                "이 링크는 1회만 사용할 수 있으며 일정 시간이 지나면 만료됩니다.\n"
+                "본인이 요청하지 않았다면 이 메일을 무시해 주세요."
+            )
+            intro_html += (
+                "<p style=\"margin:0 0 12px;\">링크가 열리지 않으면 아래 인증번호로도 재설정할 수 있습니다.</p>"
+            )
+            after_code = "이 요청을 본인이 하지 않았다면 이 메일을 무시해 주세요."
+            footer_note = "이 메일은 Felunai 비밀번호 재설정을 위해 자동 발송되었습니다."
+
+        text = "\n".join([
+            intro.strip(),
+            "",
+            f"인증번호: {verification_code}",
+            "",
+            after_code,
+        ])
+        body_html = intro_html + code_block + (
+            f"<p style=\"margin:0;color:#98a1b3;\">{escape(after_code)}</p>"
+        )
+        html = self._build_email_html(
+            site_url=site_url,
+            title=title,
+            subtitle="Secure Password Reset",
+            body_html=body_html,
+            footer_note=footer_note,
+        )
+        self._send_email(
+            to_email=to_email,
+            subject=VERIFICATION_EMAIL_SUBJECT,
+            text=text,
+            html=html,
+        )
+        logger.info("%s %s 인증 메일 발송 완료: %s", self.provider, purpose, to_email)
+
     def send_signup_verification_email(
         self,
         *,
@@ -188,36 +289,13 @@ class MailService:
         verification_code: str,
         site_url: str | None = None,
     ) -> None:
-        if not self.configured:
-            raise RuntimeError("mail_not_configured")
-
-        text = "\n".join([
-            "Felunai 회원가입 이메일 인증 요청이 접수되었습니다.",
-            "",
-            f"인증번호: {verification_code}",
-            "",
-            "회원가입 화면에서 위 인증번호를 입력해 인증을 완료해 주세요.",
-            "본인이 요청하지 않았다면 이 메일을 무시해 주세요.",
-        ])
-        html = self._build_email_html(
-            site_url=site_url,
-            title="회원가입 이메일 인증번호",
-            subtitle="Brand Verification",
-            body_html=(
-                "<p style=\"margin:0 0 16px;\">Felunai 회원가입 이메일 인증 요청이 접수되었습니다.</p>"
-                "<p style=\"margin:0 0 24px;\">아래 인증번호를 회원가입 화면에 입력해 인증을 완료해 주세요.</p>"
-                f"<div style=\"margin:0 0 24px;padding:16px 20px;border-radius:18px;background:#151b2b;border:1px solid rgba(151,139,255,0.24);font-size:30px;font-weight:700;letter-spacing:0.32em;text-align:center;color:#b7b1ff;\">{escape(verification_code)}</div>"
-                "<p style=\"margin:0;color:#98a1b3;\">본인이 요청하지 않았다면 이 메일을 무시해 주세요.</p>"
-            ),
-            footer_note="이 메일은 Felunai 회원가입 이메일 인증을 위해 자동 발송되었습니다.",
-        )
-        self._send_email(
+        self.send_verification_code_email(
             to_email=to_email,
-            subject="[Felunai] 회원가입 이메일 인증번호",
-            text=text,
-            html=html,
+            display_name="회원님",
+            verification_code=verification_code,
+            purpose="signup",
+            site_url=site_url,
         )
-        logger.info("%s 회원가입 이메일 인증 메일 발송 완료: %s", self.provider, to_email)
 
     def send_password_reset_email(
         self,
@@ -228,40 +306,12 @@ class MailService:
         reset_code: str,
         site_url: str | None = None,
     ) -> None:
-        if not self.configured:
-            raise RuntimeError("mail_not_configured")
-
-        text = "\n".join([
-            f"{display_name}님, 안녕하세요.",
-            "",
-            "Felunai 비밀번호 재설정 요청이 접수되었습니다.",
-            "아래 링크를 눌러 새 비밀번호를 설정해 주세요.",
-            "",
-            reset_url,
-            "",
-            f"링크가 열리지 않으면 인증번호 {reset_code} 를 입력해서도 재설정할 수 있습니다.",
-            "",
-            "이 링크는 1회만 사용할 수 있으며 일정 시간이 지나면 만료됩니다.",
-            "본인이 요청하지 않았다면 이 메일을 무시해 주세요.",
-        ])
-        html = self._build_email_html(
-            site_url=site_url,
-            title="비밀번호 재설정 안내",
-            subtitle="Secure Password Reset",
-            body_html=(
-                f"<p style=\"margin:0 0 16px;\">{escape(display_name)}님, 안녕하세요.</p>"
-                "<p style=\"margin:0 0 16px;\">Felunai 비밀번호 재설정 요청이 접수되었습니다. 아래 버튼을 눌러 새 비밀번호를 설정해 주세요.</p>"
-                f"<div style=\"margin:0 0 24px;\"><a href=\"{escape(reset_url)}\" style=\"display:inline-block;padding:14px 22px;border-radius:14px;background:linear-gradient(135deg,#8c84ff,#6a63e6);color:#ffffff;text-decoration:none;font-weight:700;\">비밀번호 재설정하기</a></div>"
-                "<p style=\"margin:0 0 12px;\">링크가 열리지 않으면 아래 인증번호로도 재설정할 수 있습니다.</p>"
-                f"<div style=\"margin:0 0 24px;padding:16px 20px;border-radius:18px;background:#151b2b;border:1px solid rgba(151,139,255,0.24);font-size:30px;font-weight:700;letter-spacing:0.32em;text-align:center;color:#b7b1ff;\">{escape(reset_code)}</div>"
-                "<p style=\"margin:0;color:#98a1b3;\">이 요청을 본인이 하지 않았다면 이 메일을 무시해 주세요.</p>"
-            ),
-            footer_note="이 메일은 Felunai 비밀번호 재설정을 위해 자동 발송되었습니다.",
-        )
-        self._send_email(
+        self.send_verification_code_email(
             to_email=to_email,
-            subject="[Felunai] 비밀번호 재설정 링크",
-            text=text,
-            html=html,
+            display_name=display_name,
+            verification_code=reset_code,
+            purpose="password_reset",
+            site_url=site_url,
+            action_url=reset_url,
+            action_label="비밀번호 재설정하기",
         )
-        logger.info("%s 비밀번호 재설정 메일 발송 완료: %s", self.provider, to_email)
