@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 RESEND_TEST_LIMIT_MSG = (
     "현재 발신 주소(onboarding@resend.dev)는 Resend에 가입한 이메일로만 보낼 수 있습니다. "
-    "다른 주소로내려면 Resend에서 도메인을 인증한 뒤 "
+    "다른 이메일 주소로 발송하려면 Resend에서 도메인을 인증한 뒤 "
     "MAIL_FROM을 인증된 주소(예: Felunai <noreply@본인도메인.com>)로 바꿔 주세요."
 )
 
