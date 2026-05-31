@@ -208,7 +208,10 @@ def api_register_email_code_request():
 
     return jsonify({
         "success": True,
-        "message": "입력한 이메일로 인증번호를 보냈습니다.",
+        "message": (
+            "입력한 이메일로 인증번호를 보냈습니다. "
+            "1~2분 내에 오지 않으면 스팸·프로모션함을 확인한 뒤 다시 요청해 주세요."
+        ),
     })
 
 

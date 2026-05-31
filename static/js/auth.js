@@ -90,6 +90,27 @@ const AuthHelper = (() => {
       }
     });
 
+    let signupCodeCooldownTimer = null;
+
+    function startSignupCodeCooldown(seconds = 45) {
+      if (!sendCodeBtn) return;
+      let remain = seconds;
+      sendCodeBtn.disabled = true;
+      const defaultLabel = sendCodeBtn.textContent;
+      const tick = () => {
+        if (remain <= 0) {
+          sendCodeBtn.disabled = false;
+          sendCodeBtn.textContent = defaultLabel;
+          signupCodeCooldownTimer = null;
+          return;
+        }
+        sendCodeBtn.textContent = `다시 받기 (${remain}초)`;
+        remain -= 1;
+        signupCodeCooldownTimer = window.setTimeout(tick, 1000);
+      };
+      tick();
+    }
+
     sendCodeBtn?.addEventListener("click", async () => {
       showError("registerError", "");
       const email = normalizeEmail(emailInput?.value);
@@ -98,22 +119,29 @@ const AuthHelper = (() => {
         emailInput?.focus();
         return;
       }
+      if (signupCodeCooldownTimer) return;
       sendCodeBtn.disabled = true;
-      setStatus("registerEmailStatus", "인증번호를 보내는 중입니다...");
+      setStatus("registerEmailStatus", "인증번호를 보내는 중입니다... (최대 1분)");
       try {
         const data = await postJson("/api/register/email-code/request", { email });
         if (data.success) {
           verifiedEmail = "";
-          setStatus("registerEmailStatus", data.message || "입력한 이메일로 인증번호를 보냈습니다.", "#8ec9b0");
+          setStatus(
+            "registerEmailStatus",
+            data.message ||
+              "입력한 이메일로 인증번호를 보냈습니다. 스팸함도 확인해 주세요.",
+            "#8ec9b0"
+          );
           emailCodeInput?.focus();
-        } else {
-          showError("registerError", data.error || "인증번호 요청에 실패했습니다.");
-          setStatus("registerEmailStatus", "");
+          startSignupCodeCooldown(45);
+          return;
         }
+        showError("registerError", data.error || "인증번호 요청에 실패했습니다.");
+        setStatus("registerEmailStatus", "");
+        sendCodeBtn.disabled = false;
       } catch (err) {
         showError("registerError", err.message || "서버 연결에 실패했습니다.");
         setStatus("registerEmailStatus", "");
-      } finally {
         sendCodeBtn.disabled = false;
       }
     });

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import smtplib
+import time
 from email.message import EmailMessage
 from html import escape
 from urllib import error, request
@@ -34,6 +35,14 @@ class MailService:
         if SMTP_HOST and SMTP_PORT and SMTP_USERNAME and SMTP_PASSWORD and MAIL_FROM:
             return "smtp"
         return None
+
+    @property
+    def smtp_configured(self) -> bool:
+        return bool(SMTP_HOST and SMTP_PORT and SMTP_USERNAME and SMTP_PASSWORD and MAIL_FROM)
+
+    @property
+    def resend_configured(self) -> bool:
+        return bool(RESEND_API_KEY and MAIL_FROM)
 
     def _send_message_smtp(self, msg: EmailMessage) -> None:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as smtp:
@@ -104,7 +113,7 @@ class MailService:
             },
         )
         try:
-            with request.urlopen(req, timeout=15) as resp:
+            with request.urlopen(req, timeout=25) as resp:
                 body = resp.read().decode("utf-8", errors="replace")
                 if resp.status >= 400:
                     raise RuntimeError(f"resend_http_{resp.status}: {body}")
@@ -115,6 +124,23 @@ class MailService:
         except error.URLError as exc:
             raise RuntimeError(f"resend_network_error: {exc.reason}") from exc
 
+    def _build_smtp_message(
+        self,
+        *,
+        to_email: str,
+        subject: str,
+        text: str,
+        html: str | None = None,
+    ) -> EmailMessage:
+        msg = EmailMessage()
+        msg["Subject"] = subject
+        msg["From"] = MAIL_FROM
+        msg["To"] = to_email
+        msg.set_content(text)
+        if html:
+            msg.add_alternative(html, subtype="html")
+        return msg
+
     def _send_email(
         self,
         *,
@@ -123,19 +149,36 @@ class MailService:
         text: str,
         html: str | None = None,
     ) -> None:
-        if self.provider == "resend":
-            self._send_message_resend(to_email=to_email, subject=subject, text=text, html=html)
-            return
-        if self.provider == "smtp":
-            msg = EmailMessage()
-            msg["Subject"] = subject
-            msg["From"] = MAIL_FROM
-            msg["To"] = to_email
-            msg.set_content(text)
-            if html:
-                msg.add_alternative(html, subtype="html")
-            self._send_message_smtp(msg)
-            return
+        errors: list[str] = []
+        msg = self._build_smtp_message(
+            to_email=to_email,
+            subject=subject,
+            text=text,
+            html=html,
+        )
+
+        if self.resend_configured:
+            for attempt in range(2):
+                try:
+                    self._send_message_resend(to_email=to_email, subject=subject, text=text, html=html)
+                    return
+                except Exception as exc:
+                    errors.append(f"resend:{exc}")
+                    logger.warning("Resend 발송 실패 (시도 %s/2): %s", attempt + 1, exc)
+                    if attempt == 0:
+                        time.sleep(1.2)
+
+        if self.smtp_configured:
+            try:
+                self._send_message_smtp(msg)
+                logger.info("SMTP 폴백 메일 발송 완료: %s", to_email)
+                return
+            except Exception as exc:
+                errors.append(f"smtp:{exc}")
+                logger.exception("SMTP 발송 실패: %s", exc)
+
+        if errors:
+            raise RuntimeError(" | ".join(errors))
         raise RuntimeError("mail_not_configured")
 
     def send_signup_verification_email(
