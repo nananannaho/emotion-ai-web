@@ -14,6 +14,7 @@ from config import (
     MAIL_FROM,
     RESEND_API_BASE,
     RESEND_API_KEY,
+    RESEND_OWNER_EMAIL,
     SMTP_HOST,
     SMTP_PASSWORD,
     SMTP_PORT,
@@ -22,8 +23,11 @@ from config import (
 
 logger = logging.getLogger(__name__)
 
-# 비밀번호 재설정 메일과 동일한 제목·템플릿 (수신 안정성)
-VERIFICATION_EMAIL_SUBJECT = "[Felunai] 비밀번호 재설정 링크"
+RESEND_TEST_LIMIT_MSG = (
+    "현재 발신 주소(onboarding@resend.dev)는 Resend에 가입한 이메일로만 보낼 수 있습니다. "
+    "다른 주소로내려면 Resend에서 도메인을 인증한 뒤 "
+    "MAIL_FROM을 인증된 주소(예: Felunai <noreply@본인도메인.com>)로 바꿔 주세요."
+)
 
 
 class MailService:
@@ -46,6 +50,30 @@ class MailService:
     @property
     def resend_configured(self) -> bool:
         return bool(RESEND_API_KEY and MAIL_FROM)
+
+    @staticmethod
+    def uses_resend_test_sender() -> bool:
+        return "resend.dev" in (MAIL_FROM or "").lower()
+
+    @staticmethod
+    def delivery_error_message(exc: Exception) -> str:
+        raw = str(exc).lower()
+        if (
+            "resend_test_limit" in raw
+            or "resend_http_403" in raw
+            or "only send testing emails" in raw
+            or "verify a domain" in raw
+        ):
+            return RESEND_TEST_LIMIT_MSG
+        return "이메일을 보내지 못했습니다. 잠시 후 다시 시도해 주세요."
+
+    def _ensure_can_send_to(self, to_email: str) -> None:
+        target = (to_email or "").strip().lower()
+        if not self.uses_resend_test_sender():
+            return
+        owner = RESEND_OWNER_EMAIL
+        if owner and target != owner:
+            raise RuntimeError(f"resend_test_limit: {RESEND_TEST_LIMIT_MSG}")
 
     def _send_message_smtp(self, msg: EmailMessage) -> None:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as smtp:
@@ -107,6 +135,7 @@ class MailService:
         )
 
     def _send_message_resend(self, *, to_email: str, subject: str, text: str, html: str | None = None) -> None:
+        self._ensure_can_send_to(to_email)
         payload = json.dumps({
             "from": MAIL_FROM,
             "to": [to_email],
@@ -132,6 +161,9 @@ class MailService:
                 logger.info("Resend 메일 발송 완료: %s", body)
         except error.HTTPError as exc:
             body = exc.read().decode("utf-8", errors="replace")
+            lower = body.lower()
+            if exc.code == 403 or "only send testing emails" in lower:
+                raise RuntimeError(f"resend_test_limit: {RESEND_TEST_LIMIT_MSG}") from exc
             raise RuntimeError(f"resend_http_{exc.code}: {body}") from exc
         except error.URLError as exc:
             raise RuntimeError(f"resend_network_error: {exc.reason}") from exc
@@ -169,6 +201,16 @@ class MailService:
             html=html,
         )
 
+        # 테스트 발신 주소일 때는 SMTP를 먼저 시도 (실제 수신 가능)
+        if self.uses_resend_test_sender() and self.smtp_configured:
+            try:
+                self._send_message_smtp(msg)
+                logger.info("SMTP 메일 발송 완료 (Resend 테스트 발신 우회): %s", to_email)
+                return
+            except Exception as exc:
+                errors.append(f"smtp:{exc}")
+                logger.warning("SMTP 우선 발송 실패, Resend 시도: %s", exc)
+
         if self.resend_configured:
             for attempt in range(2):
                 try:
@@ -204,12 +246,16 @@ class MailService:
         action_url: str | None = None,
         action_label: str | None = None,
     ) -> None:
-        """비밀번호 재설정·회원가입 공통 인증번호 메일 (동일 제목·템플릿)."""
         if not self.configured:
             raise RuntimeError("mail_not_configured")
 
         name = (display_name or "회원").strip() or "회원"
         code_block = self._verification_code_block_html(verification_code)
+        subject = (
+            "[Felunai] 회원가입 인증번호"
+            if purpose == "signup"
+            else "[Felunai] 비밀번호 재설정 링크"
+        )
 
         if purpose == "signup":
             title = "회원가입 이메일 인증"
@@ -276,7 +322,7 @@ class MailService:
         )
         self._send_email(
             to_email=to_email,
-            subject=VERIFICATION_EMAIL_SUBJECT,
+            subject=subject,
             text=text,
             html=html,
         )

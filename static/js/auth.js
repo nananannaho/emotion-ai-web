@@ -120,15 +120,14 @@ const AuthHelper = (() => {
       }
       if (signupCodeCooldownTimer) return;
       sendCodeBtn.disabled = true;
-      setStatus("registerEmailStatus", "인증번호를 준비 중입니다... (비밀번호 재설정과 동일)");
+      setStatus("registerEmailStatus", "인증번호를 보내는 중입니다...");
       try {
         const data = await postJson("/api/register/email-code/request", { email });
         if (data.success) {
           verifiedEmail = "";
           setStatus(
             "registerEmailStatus",
-            data.message ||
-              "입력한 이메일로 인증번호를 보냈습니다. 비밀번호 재설정 메일과 같은 형식입니다.",
+            data.message || "입력한 이메일로 인증번호를 보냈습니다.",
             "#8ec9b0"
           );
           emailCodeInput?.focus();

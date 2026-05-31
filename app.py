@@ -83,8 +83,10 @@ def health():
         "emotion_ml": (WEIGHTS_DIR / "emotion_clf.joblib").exists(),
         "database": db.backend,
         "database_url_set": bool(DATABASE_URL),
-        "api_version": 15,
+        "api_version": 16,
         "chatbot_engine": "gemini" if GEMINI_API_KEY else "local",
+        "mail_provider": mail_service.provider,
+        "mail_resend_test_sender": mail_service.uses_resend_test_sender(),
     })
 
 
@@ -203,14 +205,13 @@ def api_register_email_code_request():
         logger.exception("회원가입 이메일 인증 메일 발송 실패: %s", exc)
         return jsonify({
             "success": False,
-            "error": "이메일 인증번호를 보내지 못했습니다. 잠시 후 다시 시도해 주세요.",
+            "error": mail_service.delivery_error_message(exc),
         }), 500
 
     return jsonify({
         "success": True,
         "message": (
             "입력한 이메일로 인증번호를 보냈습니다. "
-            "비밀번호 재설정 메일과 같은 방식으로 발송됩니다. "
             "1~2분 내에 오지 않으면 스팸·프로모션함을 확인한 뒤 다시 요청해 주세요."
         ),
     })
@@ -351,7 +352,7 @@ def api_password_reset_request():
         logger.exception("비밀번호 재설정 메일 발송 실패: %s", exc)
         return jsonify({
             "success": False,
-            "error": "비밀번호 재설정 메일을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.",
+            "error": mail_service.delivery_error_message(exc),
         }), 500
 
     return jsonify({
