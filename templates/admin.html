@@ -63,13 +63,22 @@
             <td>{{ user_item.mood_count }}</td>
             <td>{{ user_item.chat_count }}</td>
             <td>
-              <button
-                type="button"
-                class="btn btn-ghost btn-danger admin-delete-btn"
-                data-username="{{ user_item.username }}"
-              >
-                계정 삭제
-              </button>
+              <div class="admin-user-actions">
+                <button
+                  type="button"
+                  class="btn btn-ghost admin-password-btn"
+                  data-username="{{ user_item.username }}"
+                >
+                  비밀번호 변경
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-danger admin-delete-btn"
+                  data-username="{{ user_item.username }}"
+                >
+                  계정 삭제
+                </button>
+              </div>
             </td>
           </tr>
           {% endfor %}
@@ -93,6 +102,79 @@
   document.getElementById("adminLogoutBtn")?.addEventListener("click", async () => {
     await fetch("/api/logout", { method: "POST" });
     window.location.href = "/login";
+  });
+
+  function validateAdminPassword(password) {
+    if (!password || password.length < 8) {
+      return "비밀번호는 8자 이상이어야 합니다.";
+    }
+    if (/[*&"]/.test(password)) {
+      return '비밀번호에 *, &, " 문자는 사용할 수 없습니다.';
+    }
+    if (!/[!@#$%^()_+\-=[\]{}|;:',.<>?/\\`~]/.test(password)) {
+      return '비밀번호에 특수문자를 1개 이상 포함해 주세요 (*, &, " 제외).';
+    }
+    return null;
+  }
+
+  function showAdminError(msg) {
+    if (!adminErrorEl) return;
+    adminErrorEl.hidden = !msg;
+    adminErrorEl.textContent = msg || "";
+  }
+
+  function showAdminStatus(msg, color = "") {
+    if (!adminStatusEl) return;
+    adminStatusEl.textContent = msg || "";
+    adminStatusEl.style.color = color;
+  }
+
+  document.querySelectorAll(".admin-password-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const username = btn.dataset.username;
+      if (!username) return;
+
+      const password = window.prompt(`${username} 계정의 새 비밀번호를 입력하세요.`);
+      if (password === null) return;
+
+      const pwdErr = validateAdminPassword(password);
+      if (pwdErr) {
+        showAdminError(pwdErr);
+        showAdminStatus("");
+        return;
+      }
+
+      const confirmPassword = window.prompt(`${username} 계정의 새 비밀번호를 다시 입력하세요.`);
+      if (confirmPassword === null) return;
+      if (password !== confirmPassword) {
+        showAdminError("비밀번호 확인이 일치하지 않습니다.");
+        showAdminStatus("");
+        return;
+      }
+
+      showAdminError("");
+      showAdminStatus("비밀번호를 변경하는 중입니다...");
+      btn.disabled = true;
+      try {
+        const res = await fetch("/api/admin/users/password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showAdminStatus(data.message || "비밀번호를 변경했습니다.", "#8ec9b0");
+          return;
+        }
+        showAdminError(data.error || "비밀번호 변경에 실패했습니다.");
+        showAdminStatus("");
+      } catch (err) {
+        showAdminError(err.message || "서버 연결에 실패했습니다.");
+        showAdminStatus("");
+      } finally {
+        btn.disabled = false;
+      }
+    });
   });
 
   document.querySelectorAll(".admin-delete-btn").forEach((btn) => {

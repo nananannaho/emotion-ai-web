@@ -399,6 +399,28 @@ class AuthService:
             return {"success": False, "error": "계정 삭제 중 오류가 발생했습니다."}
         return {"success": True, "message": f"{username} 계정을 삭제했습니다."}
 
+    def admin_set_password(self, username: str, new_password: str) -> dict:
+        username = (username or "").strip()
+        if not username:
+            return {"success": False, "error": "사용자 이름이 필요합니다."}
+        if username == ADMIN_USERNAME:
+            return {"success": False, "error": "관리자 비밀번호는 로그인 화면에서 변경할 수 없습니다."}
+
+        profile = self.db.get_user_full(username)
+        if not profile:
+            return {"success": False, "error": "사용자를 찾을 수 없습니다."}
+
+        pwd_err = validate_password(new_password)
+        if pwd_err:
+            return {"success": False, "error": pwd_err}
+
+        try:
+            self.db.update_password_hash(username, generate_password_hash(new_password))
+        except Exception as exc:
+            logger.exception("관리자 비밀번호 변경 실패 (%s): %s", username, exc)
+            return {"success": False, "error": "비밀번호 변경 중 오류가 발생했습니다."}
+        return {"success": True, "message": f"{username} 계정의 비밀번호를 변경했습니다."}
+
     def delete_account(self, username: str, password: str) -> dict:
         profile = self.db.get_user_full(username)
         if not profile:

@@ -344,6 +344,20 @@ def api_admin_delete_user():
     return jsonify(result), status
 
 
+@app.post("/api/admin/users/password")
+def api_admin_set_password():
+    if not _is_admin_session():
+        return jsonify({"success": False, "error": "관리자 로그인이 필요합니다."}), 403
+
+    data = request.get_json(silent=True) or {}
+    result = auth_service.admin_set_password(
+        data.get("username") or "",
+        data.get("password") or "",
+    )
+    status = 200 if result.get("success") else 400
+    return jsonify(result), status
+
+
 @app.post("/api/face/update")
 def api_update_face():
     if not session.get("user"):
