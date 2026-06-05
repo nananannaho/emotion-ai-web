@@ -83,7 +83,7 @@ def health():
         "emotion_ml": (WEIGHTS_DIR / "emotion_clf.joblib").exists(),
         "database": db.backend,
         "database_url_set": bool(DATABASE_URL),
-        "api_version": 16,
+        "api_version": 17,
         "chatbot_engine": "gemini" if GEMINI_API_KEY else "local",
         "mail_provider": mail_service.provider,
         "mail_resend_test_sender": mail_service.uses_resend_test_sender(),
@@ -114,7 +114,6 @@ def sitemap_xml():
         f"{root}/",
         f"{root}/login",
         f"{root}/register",
-        f"{root}/forgot-password",
     ]
     body = [
         '<?xml version="1.0" encoding="UTF-8"?>',
@@ -140,25 +139,6 @@ def login_page():
     return render_template("login.html")
 
 
-@app.route("/forgot-password")
-def forgot_password_page():
-    return render_template("forgot_password.html")
-
-
-@app.route("/reset-password")
-def reset_password_page():
-    selector = (request.args.get("selector") or "").strip()
-    token = (request.args.get("token") or "").strip()
-    verify = auth_service.verify_password_reset_token(selector, token)
-    return render_template(
-        "reset_password.html",
-        selector=selector,
-        token=token,
-        token_valid=bool(verify.get("success")),
-        token_error=verify.get("error", ""),
-    )
-
-
 @app.route("/dashboard")
 def dashboard():
     if not session.get("user"):
@@ -179,53 +159,6 @@ def admin_page():
         users=users,
         total_users=len(users),
     )
-
-
-@app.post("/api/register/email-code/request")
-def api_register_email_code_request():
-    if not mail_service.configured:
-        return jsonify({
-            "success": False,
-            "error": "이메일 인증 기능이 아직 설정되지 않았습니다.",
-        }), 503
-
-    data = request.get_json(silent=True) or {}
-    result = auth_service.request_signup_email_verification(data.get("email") or "")
-    if not result.get("success"):
-        return jsonify(result), 400
-
-    try:
-        if result.get("email_sent"):
-            mail_service.send_signup_verification_email(
-                to_email=result["email"],
-                verification_code=result["verification_code"],
-                site_url=request.url_root.rstrip("/"),
-            )
-    except Exception as exc:
-        logger.exception("회원가입 이메일 인증 메일 발송 실패: %s", exc)
-        return jsonify({
-            "success": False,
-            "error": mail_service.delivery_error_message(exc),
-        }), 500
-
-    return jsonify({
-        "success": True,
-        "message": (
-            "입력한 이메일로 인증번호를 보냈습니다. "
-            "1~2분 내에 오지 않으면 스팸·프로모션함을 확인한 뒤 다시 요청해 주세요."
-        ),
-    })
-
-
-@app.post("/api/register/email-code/verify")
-def api_register_email_code_verify():
-    data = request.get_json(silent=True) or {}
-    result = auth_service.verify_signup_email_code(
-        data.get("email") or "",
-        data.get("code") or "",
-    )
-    status = 200 if result.get("success") else 400
-    return jsonify(result), status
 
 
 @app.post("/api/register")
@@ -318,82 +251,6 @@ def api_login_face():
             "success": False,
             "error": "로그인 처리 중 서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
         }), 500
-
-
-@app.post("/api/password-reset/request")
-def api_password_reset_request():
-    if not mail_service.configured:
-        return jsonify({
-            "success": False,
-            "error": "비밀번호 재설정 메일 기능이 아직 설정되지 않았습니다.",
-        }), 503
-
-    data = request.get_json(silent=True) or {}
-    result = auth_service.request_password_reset(data.get("email") or "")
-    if not result.get("success"):
-        return jsonify(result), 400
-
-    try:
-        if result.get("email_sent"):
-            reset_url = url_for(
-                "reset_password_page",
-                selector=result["selector"],
-                token=result["token"],
-                _external=True,
-            )
-            mail_service.send_password_reset_email(
-                to_email=result["email"],
-                display_name=result["display_name"],
-                reset_url=reset_url,
-                reset_code=result["reset_code"],
-                site_url=request.url_root.rstrip("/"),
-            )
-    except Exception as exc:
-        logger.exception("비밀번호 재설정 메일 발송 실패: %s", exc)
-        return jsonify({
-            "success": False,
-            "error": mail_service.delivery_error_message(exc),
-        }), 500
-
-    return jsonify({
-        "success": True,
-        "message": "입력한 이메일로 재설정 링크와 인증번호를 보냈습니다. 계정이 없다면 메일이 오지 않을 수 있습니다.",
-    })
-
-
-@app.post("/api/password-reset/confirm")
-def api_password_reset_confirm():
-    data = request.get_json(silent=True) or {}
-    result = auth_service.reset_password(
-        selector=data.get("selector") or "",
-        token=data.get("token") or "",
-        new_password=data.get("password") or "",
-    )
-    status = 200 if result.get("success") else 400
-    return jsonify(result), status
-
-
-@app.post("/api/password-reset/verify-code")
-def api_password_reset_verify_code():
-    data = request.get_json(silent=True) or {}
-    result = auth_service.verify_password_reset_code(
-        email=data.get("email") or "",
-        code=data.get("code") or "",
-    )
-    status = 200 if result.get("success") else 400
-    return jsonify(result), status
-
-
-@app.post("/api/password-reset/confirm-code")
-def api_password_reset_confirm_code():
-    data = request.get_json(silent=True) or {}
-    result = auth_service.reset_password_with_code(
-        email=data.get("email") or "",
-        code=data.get("code") or "",
-        new_password=data.get("password") or "",
-    )
-    status = 200 if result.get("success") else 400
-    return jsonify(result), status
 
 
 @app.post("/api/emotion/analyze")

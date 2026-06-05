@@ -46,11 +46,7 @@
             <button type="button" class="password-toggle-btn" aria-label="비밀번호 보기" aria-pressed="false">보기</button>
           </div>
         </label>
-        <div class="auth-action-stack auth-action-stack--spacious">
-          <button type="submit" class="btn btn-primary btn-block">로그인</button>
-          <a href="/forgot-password" class="btn btn-ghost btn-block">이메일로 인증번호 받기</a>
-        </div>
-        <p class="auth-footer"><a href="/forgot-password">비밀번호 재설정</a></p>
+        <button type="submit" class="btn btn-primary btn-block">로그인</button>
       </form>
     </div>
 
@@ -63,7 +59,7 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/api.js') }}"></script>
 <script src="{{ url_for('static', filename='js/camera.js') }}"></script>
-<script src="{{ url_for('static', filename='js/auth.js') }}?v=20"></script>
+<script src="{{ url_for('static', filename='js/auth.js') }}?v=23"></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     CameraHelper.init('loginVideo', 'loginCanvas');
