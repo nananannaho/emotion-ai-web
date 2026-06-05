@@ -14,3 +14,5 @@ weights/*.keras
 weights/haarcascade*.xml
 .DS_Store
 *.log
+.cursor/
+repo.url
