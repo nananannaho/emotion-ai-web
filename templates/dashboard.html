@@ -64,8 +64,6 @@
       <div class="camera-wrap dash-camera">
         <video id="dashVideo" autoplay playsinline muted></video>
         <canvas id="dashCanvas" hidden></canvas>
-        <canvas id="faceMeshCanvas" class="face-mesh-canvas" aria-hidden="true"></canvas>
-        <div id="faceOverlay" class="face-overlay" hidden></div>
         <div id="liveEmotionChip" class="live-emotion-chip" hidden>
           <span id="liveEmotionEmoji" class="chip-emoji" aria-hidden="true"></span>
           <span id="liveEmotionLabel"></span>
@@ -145,5 +143,5 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/camera.js') }}"></script>
-<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=13"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=14"></script>
 {% endblock %}

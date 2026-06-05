@@ -812,7 +812,7 @@ body {
 
 /* Dashboard */
 .dashboard {
-  max-width: 1100px;
+  max-width: 1200px;
 }
 
 .admin-page {
@@ -1020,7 +1020,7 @@ body {
   display: grid;
   grid-template-columns: minmax(280px, 1fr) 1.25fr;
   gap: 1.25rem;
-  align-items: stretch;
+  align-items: start;
 }
 
 .dash-camera-sticky {
@@ -1032,7 +1032,7 @@ body {
   z-index: 1;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: auto;
 }
 
 .dash-actions-row {
@@ -1099,26 +1099,12 @@ body {
 .dash-camera {
   position: relative;
   margin-bottom: 0.5rem;
-  flex: 1 1 auto;
-  min-height: 320px;
+  flex: 0 0 auto;
 }
 
 .dash-camera.camera-wrap {
   aspect-ratio: 3 / 4;
   margin-bottom: 0.5rem;
-}
-
-.face-mesh-canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 4;
-}
-
-.face-overlay {
-  display: none !important;
 }
 
 .dash-camera .live-emotion-chip {
@@ -1219,7 +1205,7 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 420px;
-  height: 100%;
+  height: auto;
 }
 
 .chat-panel-header {
@@ -1325,23 +1311,35 @@ body {
 }
 
 @media (min-width: 901px) {
+  .dash-header {
+    margin-bottom: 1.25rem;
+  }
+
   .dash-layout {
-    grid-template-columns: minmax(300px, 380px) 1fr;
+    grid-template-columns: minmax(280px, 340px) minmax(0, 1.85fr);
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .dash-camera-sticky {
+    align-self: start;
   }
 
   .dash-camera.camera-wrap {
     aspect-ratio: 3 / 4;
-    min-height: 420px;
-    max-height: none;
+    min-height: 500px;
+    width: 100%;
   }
 
   .chat-panel {
-    min-height: 0;
+    min-height: calc(100vh - 10.5rem);
+    height: calc(100vh - 10.5rem);
   }
 
   .chat-scroll-wrap {
     max-height: none;
     flex: 1 1 auto;
+    min-height: 0;
   }
 
   .chat-messages::before {

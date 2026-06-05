@@ -22,161 +22,6 @@
   const BOT_AVATAR = "🤖";
   const DEFAULT_SITUATION = "general_support";
 
-  /** 캠 위 사이버 그린 얼굴 메시 오버레이 */
-  const FaceMeshOverlay = (() => {
-    const MESH_POINTS = [
-      [0.5, 0.1],
-      [0.22, 0.28], [0.78, 0.28],
-      [0.32, 0.36], [0.68, 0.36],
-      [0.38, 0.38], [0.62, 0.38],
-      [0.5, 0.46],
-      [0.5, 0.58],
-      [0.36, 0.7], [0.64, 0.7],
-      [0.5, 0.72],
-      [0.18, 0.52], [0.82, 0.52],
-      [0.28, 0.82], [0.72, 0.82],
-      [0.5, 0.9],
-    ];
-    const MESH_EDGES = [
-      [0, 1], [0, 2], [1, 3], [2, 4], [3, 5], [4, 6], [5, 6],
-      [0, 7], [7, 8], [8, 9], [8, 10], [9, 11], [10, 11],
-      [1, 12], [2, 13], [12, 14], [13, 15], [9, 14], [10, 15], [14, 16], [15, 16], [11, 16],
-    ];
-
-    let canvas = null;
-    let ctx = null;
-    let wrap = null;
-    let rafId = null;
-    let faceBox = null;
-    let faceUntil = 0;
-    let phase = 0;
-
-    function resize() {
-      if (!canvas || !wrap) return;
-      const dpr = window.devicePixelRatio || 1;
-      const w = wrap.clientWidth;
-      const h = wrap.clientHeight;
-      if (!w || !h) return;
-      canvas.width = Math.round(w * dpr);
-      canvas.height = Math.round(h * dpr);
-      canvas.style.width = `${w}px`;
-      canvas.style.height = `${h}px`;
-      if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    }
-
-    function drawHudCorners(w, h, pulse) {
-      const len = Math.min(w, h) * 0.08;
-      const pad = 10;
-      const alpha = 0.35 + pulse * 0.25;
-      ctx.strokeStyle = `rgba(57, 255, 156, ${alpha})`;
-      ctx.lineWidth = 1.5;
-      ctx.shadowColor = "rgba(57, 255, 156, 0.45)";
-      ctx.shadowBlur = 6;
-      const corners = [
-        [pad, pad + len, pad, pad, pad + len, pad],
-        [w - pad - len, pad, w - pad, pad, w - pad, pad + len],
-        [pad, h - pad - len, pad, h - pad, pad + len, h - pad],
-        [w - pad, h - pad - len, w - pad, h - pad, w - pad - len, h - pad],
-      ];
-      corners.forEach(([x1, y1, x2, y2, x3, y3]) => {
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.lineTo(x3, y3);
-        ctx.stroke();
-      });
-      ctx.shadowBlur = 0;
-    }
-
-    function drawScanLine(w, h, pulse) {
-      const y = ((phase * 0.35) % 1) * h;
-      const grad = ctx.createLinearGradient(0, y - 18, 0, y + 18);
-      grad.addColorStop(0, "rgba(57, 255, 156, 0)");
-      grad.addColorStop(0.5, `rgba(57, 255, 156, ${0.12 + pulse * 0.1})`);
-      grad.addColorStop(1, "rgba(57, 255, 156, 0)");
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, y - 18, w, 36);
-    }
-
-    function mapPoint(nx, ny, box, w, h) {
-      if (box) {
-        return { x: box.x + nx * box.w, y: box.y + ny * box.h };
-      }
-      const cx = w * 0.5;
-      const cy = h * 0.42;
-      const fw = w * 0.42;
-      const fh = h * 0.52;
-      return { x: cx - fw * 0.5 + nx * fw, y: cy - fh * 0.5 + ny * fh };
-    }
-
-    function drawMesh(w, h, pulse, active) {
-      const box = active ? faceBox : null;
-      const points = MESH_POINTS.map(([nx, ny]) => mapPoint(nx, ny, box, w, h));
-
-      // “선” 느낌을 없애고 점(dot)만 그리도록 단순화합니다.
-      const dotAlpha = active ? 0.95 : 0.35 + pulse * 0.15;
-      ctx.shadowColor = "rgba(57, 255, 156, 0.55)";
-      ctx.shadowBlur = active ? 8 : 3;
-
-      points.forEach(({ x, y }, i) => {
-        const r = active ? (i % 3 === 0 ? 3.2 : 2.2) : 1.8;
-        ctx.beginPath();
-        ctx.fillStyle = `rgba(57, 255, 156, ${dotAlpha})`;
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      ctx.shadowBlur = 0;
-    }
-
-    function frame() {
-      if (!ctx || !wrap) return;
-      const w = wrap.clientWidth;
-      const h = wrap.clientHeight;
-      if (!w || !h) {
-        rafId = requestAnimationFrame(frame);
-        return;
-      }
-      phase += 0.016;
-      const pulse = (Math.sin(phase * 3) + 1) * 0.5;
-      const active = faceBox && Date.now() < faceUntil;
-
-      ctx.clearRect(0, 0, w, h);
-      drawMesh(w, h, pulse, active);
-
-      rafId = requestAnimationFrame(frame);
-    }
-
-    return {
-      init(canvasId, wrapSelector) {
-        canvas = document.getElementById(canvasId);
-        wrap = document.querySelector(wrapSelector);
-        if (!canvas || !wrap) return;
-        ctx = canvas.getContext("2d");
-        resize();
-        window.addEventListener("resize", resize);
-        if (!rafId) rafId = requestAnimationFrame(frame);
-      },
-      showBox(box, holdMs = 4000) {
-        if (!box || !wrap) return;
-        const video = document.getElementById("dashVideo");
-        const scaleX = wrap.clientWidth / (video?.videoWidth || 640);
-        const scaleY = wrap.clientHeight / (video?.videoHeight || 480);
-        faceBox = {
-          x: box.x * scaleX,
-          y: box.y * scaleY,
-          w: box.w * scaleX,
-          h: box.h * scaleY,
-        };
-        faceUntil = Date.now() + holdMs;
-      },
-      stop() {
-        if (rafId) cancelAnimationFrame(rafId);
-        rafId = null;
-      },
-    };
-  })();
-
   let lastFusion = { fused_emotion: "neutral", situation: "general_support" };
   let lastAnalyzeAt = 0;
   let statusTimer = null;
@@ -340,11 +185,6 @@
     }
   }
 
-  function showFaceBox(box) {
-    if (!box) return;
-    FaceMeshOverlay.showBox(box, 4500);
-  }
-
   function applyEmotionResult(data, options = {}) {
     const { revealChip = true } = options;
     const visual = data.visual;
@@ -355,7 +195,6 @@
     };
     lastAnalyzeAt = Date.now();
     updateLiveChip(visual, fusion, revealChip);
-    showFaceBox(visual.face_box);
     const label =
       fusion.fused_emotion_ko ||
       visual.emotion_ko ||
@@ -593,7 +432,6 @@
     updateChatEmotionBadge("neutral", "평온");
     syncManualEmotionUi();
     await CameraHelper.init("dashVideo", "dashCanvas");
-    FaceMeshOverlay.init("faceMeshCanvas", ".dash-camera");
     CameraHelper.bindGalleryButton(
       "galleryAnalyzeBtn",
       "galleryAnalyzeInput",
