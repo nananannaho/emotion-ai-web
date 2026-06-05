@@ -112,22 +112,11 @@
     function drawMesh(w, h, pulse, active) {
       const box = active ? faceBox : null;
       const points = MESH_POINTS.map(([nx, ny]) => mapPoint(nx, ny, box, w, h));
-      const lineAlpha = active ? 0.75 + pulse * 0.2 : 0.22 + pulse * 0.12;
-      const dotAlpha = active ? 0.95 : 0.35 + pulse * 0.15;
 
-      ctx.strokeStyle = `rgba(57, 255, 156, ${lineAlpha})`;
-      ctx.lineWidth = active ? 1.4 : 1;
+      // “선” 느낌을 없애고 점(dot)만 그리도록 단순화합니다.
+      const dotAlpha = active ? 0.95 : 0.35 + pulse * 0.15;
       ctx.shadowColor = "rgba(57, 255, 156, 0.55)";
       ctx.shadowBlur = active ? 8 : 3;
-
-      MESH_EDGES.forEach(([a, b]) => {
-        const p1 = points[a];
-        const p2 = points[b];
-        ctx.beginPath();
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p2.x, p2.y);
-        ctx.stroke();
-      });
 
       points.forEach(({ x, y }, i) => {
         const r = active ? (i % 3 === 0 ? 3.2 : 2.2) : 1.8;
@@ -135,22 +124,9 @@
         ctx.fillStyle = `rgba(57, 255, 156, ${dotAlpha})`;
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();
-        if (active && i % 4 === 0) {
-          ctx.beginPath();
-          ctx.strokeStyle = `rgba(120, 255, 190, ${0.35 + pulse * 0.25})`;
-          ctx.arc(x, y, r + 4 + pulse * 2, 0, Math.PI * 2);
-          ctx.stroke();
-        }
       });
-      ctx.shadowBlur = 0;
 
-      if (active && box) {
-        ctx.strokeStyle = `rgba(57, 255, 156, ${0.55 + pulse * 0.25})`;
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([6, 4]);
-        ctx.strokeRect(box.x, box.y, box.w, box.h);
-        ctx.setLineDash([]);
-      }
+      ctx.shadowBlur = 0;
     }
 
     function frame() {
@@ -166,8 +142,6 @@
       const active = faceBox && Date.now() < faceUntil;
 
       ctx.clearRect(0, 0, w, h);
-      drawScanLine(w, h, pulse);
-      drawHudCorners(w, h, pulse);
       drawMesh(w, h, pulse, active);
 
       rafId = requestAnimationFrame(frame);
