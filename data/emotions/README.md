@@ -22,9 +22,9 @@ data/emotions/
 ## 학습 방법 (PC에서)
 
 1. 위 폴더에 사진 복사
-2. `학습-실행.bat` 더블클릭  
-   또는:
+2. 터미널에서:
    ```bash
+   python scripts/download_fer2013.py
    python scripts/train_emotion_classifier.py
    ```
 3. `weights/emotion_clf.joblib` 생성 확인
