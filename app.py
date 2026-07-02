@@ -1,5 +1,5 @@
 """
-EmotionAI — 딥러닝 감정 인식 & 맞춤형 챗봇 웹 애플리케이션
+Felunai — 딥러닝 감정 인식 & 맞춤형 챗봇 웹 애플리케이션
 """
 
 from __future__ import annotations
@@ -13,11 +13,14 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import (
     ADMIN_USERNAME,
+    API_VERSION,
     DATABASE_URL,
     FELUNAI_CONTACT_EMAIL,
     GEMINI_API_KEY,
     IS_CLOUD,
+    MAX_CONTENT_LENGTH,
     SECRET_KEY,
+    SKIP_EMAIL_VERIFICATION,
     USE_LIGHT_ML,
 )
 from services.database import get_db
@@ -25,6 +28,7 @@ from services.auth_service import AuthService
 from services.chatbot_service import ChatbotService
 from services.emotion_service import EmotionService
 from services.mail_service import MailService
+from utils.rate_limit import rate_limit
 
 logging.basicConfig(
     level=logging.INFO,
@@ -36,6 +40,7 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
 app.config["JSON_AS_ASCII"] = False
+app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
 
 if IS_CLOUD:
     app.config["SESSION_COOKIE_SECURE"] = True
@@ -59,6 +64,7 @@ def inject_globals():
     return {
         "is_cloud": IS_CLOUD,
         "use_light_ml": USE_LIGHT_ML,
+        "skip_email_verification": SKIP_EMAIL_VERIFICATION,
         "logged_in": bool(session.get("user")),
         "is_admin": bool(session.get("is_admin")),
         "felunai_contact_email": FELUNAI_CONTACT_EMAIL,
@@ -71,6 +77,14 @@ def _is_admin_session() -> bool:
 
 @app.get("/health")
 def health():
+    return jsonify({"status": "ok", "api_version": API_VERSION})
+
+
+@app.get("/health/detail")
+def health_detail():
+    if not _is_admin_session():
+        return jsonify({"success": False, "error": "관리자 로그인이 필요합니다."}), 403
+
     from pathlib import Path
 
     from config import WEIGHTS_DIR
@@ -83,10 +97,11 @@ def health():
         "emotion_ml": (WEIGHTS_DIR / "emotion_clf.joblib").exists(),
         "database": db.backend,
         "database_url_set": bool(DATABASE_URL),
-        "api_version": 17,
+        "api_version": API_VERSION,
         "chatbot_engine": "gemini" if GEMINI_API_KEY else "local",
         "mail_provider": mail_service.provider,
         "mail_resend_test_sender": mail_service.uses_resend_test_sender(),
+        "skip_email_verification": SKIP_EMAIL_VERIFICATION,
     })
 
 
@@ -114,6 +129,8 @@ def sitemap_xml():
         f"{root}/",
         f"{root}/login",
         f"{root}/register",
+        f"{root}/forgot-password",
+        f"{root}/privacy",
     ]
     body = [
         '<?xml version="1.0" encoding="UTF-8"?>',
@@ -139,6 +156,30 @@ def login_page():
     return render_template("login.html")
 
 
+@app.route("/forgot-password")
+def forgot_password_page():
+    return render_template("forgot_password.html")
+
+
+@app.route("/privacy")
+def privacy_page():
+    return render_template("privacy.html")
+
+
+@app.route("/reset-password")
+def reset_password_page():
+    selector = (request.args.get("selector") or "").strip()
+    token = (request.args.get("token") or "").strip()
+    verify = auth_service.verify_password_reset_token(selector, token)
+    return render_template(
+        "reset_password.html",
+        selector=selector,
+        token=token,
+        token_valid=bool(verify.get("success")),
+        token_error=verify.get("error", ""),
+    )
+
+
 @app.route("/dashboard")
 def dashboard():
     if not session.get("user"):
@@ -161,7 +202,57 @@ def admin_page():
     )
 
 
+@app.post("/api/register/email-code/request")
+@rate_limit(max_calls=5, window_seconds=300)
+def api_register_email_code_request():
+    if not mail_service.configured:
+        return jsonify({
+            "success": False,
+            "error": "이메일 인증 기능이 아직 설정되지 않았습니다.",
+        }), 503
+
+    data = request.get_json(silent=True) or {}
+    result = auth_service.request_signup_email_verification(data.get("email") or "")
+    if not result.get("success"):
+        return jsonify(result), 400
+
+    try:
+        if result.get("email_sent"):
+            mail_service.send_signup_verification_email(
+                to_email=result["email"],
+                verification_code=result["verification_code"],
+                site_url=request.url_root.rstrip("/"),
+            )
+    except Exception as exc:
+        logger.exception("회원가입 이메일 인증 메일 발송 실패: %s", exc)
+        return jsonify({
+            "success": False,
+            "error": mail_service.delivery_error_message(exc),
+        }), 500
+
+    return jsonify({
+        "success": True,
+        "message": (
+            "입력한 이메일로 인증번호를 보냈습니다. "
+            "1~2분 내에 오지 않으면 스팸·프로모션함을 확인한 뒤 다시 요청해 주세요."
+        ),
+    })
+
+
+@app.post("/api/register/email-code/verify")
+@rate_limit(max_calls=10, window_seconds=300)
+def api_register_email_code_verify():
+    data = request.get_json(silent=True) or {}
+    result = auth_service.verify_signup_email_code(
+        data.get("email") or "",
+        data.get("code") or "",
+    )
+    status = 200 if result.get("success") else 400
+    return jsonify(result), status
+
+
 @app.post("/api/register")
+@rate_limit(max_calls=8, window_seconds=300)
 def api_register():
     try:
         data = request.get_json(silent=True) or {}
@@ -194,6 +285,16 @@ def api_register():
         }), 500
 
 
+@app.errorhandler(413)
+def handle_413(err):
+    if request.path.startswith("/api/"):
+        return jsonify({
+            "success": False,
+            "error": "요청 데이터가 너무 큽니다. 사진을 다시 선택해 주세요.",
+        }), 413
+    return "요청 크기가 너무 큽니다.", 413
+
+
 @app.errorhandler(500)
 def handle_500(err):
     if request.path.startswith("/api/"):
@@ -206,6 +307,7 @@ def handle_500(err):
 
 
 @app.post("/api/login/password")
+@rate_limit(max_calls=12, window_seconds=300)
 def api_login_password():
     data = request.get_json(silent=True) or {}
     result = auth_service.login_password(
@@ -222,6 +324,7 @@ def api_login_password():
 
 
 @app.post("/api/login/face")
+@rate_limit(max_calls=12, window_seconds=300)
 def api_login_face():
     try:
         data = request.get_json(silent=True) or {}
@@ -253,8 +356,88 @@ def api_login_face():
         }), 500
 
 
+@app.post("/api/password-reset/request")
+@rate_limit(max_calls=5, window_seconds=300)
+def api_password_reset_request():
+    if not mail_service.configured:
+        return jsonify({
+            "success": False,
+            "error": "비밀번호 재설정 메일 기능이 아직 설정되지 않았습니다.",
+        }), 503
+
+    data = request.get_json(silent=True) or {}
+    result = auth_service.request_password_reset(data.get("email") or "")
+    if not result.get("success"):
+        return jsonify(result), 400
+
+    try:
+        if result.get("email_sent"):
+            reset_url = url_for(
+                "reset_password_page",
+                selector=result["selector"],
+                token=result["token"],
+                _external=True,
+            )
+            mail_service.send_password_reset_email(
+                to_email=result["email"],
+                display_name=result["display_name"],
+                reset_url=reset_url,
+                reset_code=result["reset_code"],
+                site_url=request.url_root.rstrip("/"),
+            )
+    except Exception as exc:
+        logger.exception("비밀번호 재설정 메일 발송 실패: %s", exc)
+        return jsonify({
+            "success": False,
+            "error": mail_service.delivery_error_message(exc),
+        }), 500
+
+    return jsonify({
+        "success": True,
+        "message": "입력한 이메일로 재설정 링크와 인증번호를 보냈습니다. 계정이 없다면 메일이 오지 않을 수 있습니다.",
+    })
+
+
+@app.post("/api/password-reset/confirm")
+def api_password_reset_confirm():
+    data = request.get_json(silent=True) or {}
+    result = auth_service.reset_password(
+        selector=data.get("selector") or "",
+        token=data.get("token") or "",
+        new_password=data.get("password") or "",
+    )
+    status = 200 if result.get("success") else 400
+    return jsonify(result), status
+
+
+@app.post("/api/password-reset/verify-code")
+def api_password_reset_verify_code():
+    data = request.get_json(silent=True) or {}
+    result = auth_service.verify_password_reset_code(
+        email=data.get("email") or "",
+        code=data.get("code") or "",
+    )
+    status = 200 if result.get("success") else 400
+    return jsonify(result), status
+
+
+@app.post("/api/password-reset/confirm-code")
+def api_password_reset_confirm_code():
+    data = request.get_json(silent=True) or {}
+    result = auth_service.reset_password_with_code(
+        email=data.get("email") or "",
+        code=data.get("code") or "",
+        new_password=data.get("password") or "",
+    )
+    status = 200 if result.get("success") else 400
+    return jsonify(result), status
+
+
 @app.post("/api/emotion/analyze")
+@rate_limit(max_calls=30, window_seconds=60)
 def api_analyze_emotion():
+    if not session.get("user"):
+        return jsonify({"success": False, "error": "로그인이 필요합니다."}), 401
     if _is_admin_session():
         return jsonify({"success": False, "error": "관리자 계정에서는 표정 분석을 사용할 수 없습니다."}), 403
     data = request.get_json(silent=True) or {}
@@ -272,6 +455,7 @@ def api_analyze_emotion():
 
 
 @app.post("/api/chat")
+@rate_limit(max_calls=20, window_seconds=60)
 def api_chat():
     if not session.get("user"):
         return jsonify({"success": False, "error": "로그인이 필요합니다."}), 401
@@ -294,8 +478,16 @@ def api_chat():
         chat_history=chat_history,
     )
 
+    reply = (response.get("reply") or "").strip()
+    if not reply:
+        return jsonify({
+            "success": False,
+            "error": "응답을 생성하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+        }), 503
+
     auth_service.append_chat(session["user"], "user", message)
-    auth_service.append_chat(session["user"], "assistant", response["reply"])
+    auth_service.append_chat(session["user"], "assistant", reply)
+    response["reply"] = reply
 
     return jsonify({"success": True, **response})
 
@@ -306,7 +498,14 @@ def api_session():
     if not user:
         return jsonify({"logged_in": False})
     profile = auth_service.get_profile(user)
-    return jsonify({"logged_in": True, "is_admin": _is_admin_session(), "profile": profile})
+    payload = {
+        "logged_in": True,
+        "is_admin": _is_admin_session(),
+        "profile": profile,
+    }
+    if not _is_admin_session():
+        payload["chat_history"] = auth_service.get_chat_history(user)
+    return jsonify(payload)
 
 
 @app.post("/api/logout")

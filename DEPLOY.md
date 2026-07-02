@@ -1,4 +1,4 @@
-# EmotionAI 인터넷 배포 가이드 (Render 무료)
+# Felunai 인터넷 배포 가이드 (Render 무료)
 
 다른 집·학교·LTE에서도 **공개 URL**로 접속할 수 있게 하는 방법입니다.
 
@@ -18,10 +18,10 @@
 ### 방법 B — PowerShell (Git PATH 적용된 경우)
 
 ```powershell
-cd "c:\Users\parkj\OneDrive\사진\바탕 화면\동아리 웹사이트 제작"
+cd "프로젝트 폴더"
 git init
 git add .
-git commit -m "EmotionAI 웹사이트 초기 버전"
+git commit -m "Felunai 웹사이트 초기 버전"
 ```
 
 > `git`이 인식되지 않으면 **Cursor를 완전히 종료 후 다시 열기** 또는 **`github-upload.bat`** 사용.
@@ -55,18 +55,44 @@ git push -u origin main
 | 주소 | `127.0.0.1` / `192.168.x.x` | `https://xxxx.onrender.com` |
 | HTTPS | 없음(로컬) | **있음** (휴대폰 카메라에 유리) |
 | CNN(TensorFlow) | 사용 가능 | **경량 모드** (OpenCV·규칙 기반) |
-| 회원 데이터 | PC에 저장 | 서버 재시작 시 **초기화될 수 있음** (무료 한계) |
+| 회원 데이터 | PC에 저장 | Neon DB 설정 시 **영구 저장** |
 
 무료 서버 메모리 때문에 TensorFlow는 빼고, 감정·얼굴은 **경량 알고리즘**으로 동작합니다.  
 과제·시연용으로는 충분하고, 발표 시 “로컬은 CNN 풀버전, 클라우드는 경량 배포”라고 설명하면 됩니다.
 
-## 3단계: 동작 확인
+## 3단계: Render 환경변수 설정 (중요)
+
+Render 대시보드 → 서비스 → **Environment** 에서 아래를 설정하세요.
+
+| Key | 필수 | 설명 |
+|-----|------|------|
+| `USE_LIGHT_ML` | ✅ | `1` |
+| `RENDER` | ✅ | `true` |
+| `ADMIN_PASSWORD` | ✅ | 관리자 로그인 비밀번호 (강하게 설정) |
+| `DATABASE_URL` | 권장 | Neon PostgreSQL 연결 문자열 |
+| `RESEND_API_KEY` | 권장 | 회원가입·비번재설정 메일 |
+| `MAIL_FROM` | 권장 | 발신 주소 (도메인 인증 후 `noreply@본인도메인`) |
+| `RESEND_OWNER_EMAIL` | 테스트 시 | Resend 테스트 발신(`onboarding@resend.dev`)일 때 본인 이메일 |
+| `GEMINI_API_KEY` | 선택 | AI 챗봇 품질 향상 |
+
+> DB·API 키·비밀번호는 **GitHub에 올리지 마세요.** Render Environment에만 넣습니다.
+
+### Resend 테스트 발신 제한
+
+`MAIL_FROM`이 `onboarding@resend.dev`이면 **Resend 가입 이메일로만** 발송됩니다.  
+다른 사용자에게 메일을내려면 Resend에서 도메인을 인증한 뒤 `MAIL_FROM`을 바꿔 주세요.
+
+## 4단계: 동작 확인
 
 - 배포 URL 접속 → 홈 화면
 - 회원가입 → **사진 촬영/선택** (HTTPS라 모바일 카메라가 로컬보다 잘 될 때 많음)
 - 로그인 → 대시보드 → 감정 분석 · 채팅
 
-헬스 체크: `https://본인주소.onrender.com/health` → `{"status":"ok"}`
+**헬스 체크 (공개):** `https://본인주소.onrender.com/health`  
+→ `{"status":"ok","api_version":17}` (버전 숫자는 배포마다 다를 수 있음)
+
+**상세 진단 (관리자 로그인 후):** `/health/detail`  
+→ `database: postgresql`, 메일·챗봇 엔진 등 확인
 
 ## 자주 묻는 문제
 
@@ -93,24 +119,16 @@ pip install --upgrade pip && pip install -r requirements-deploy.txt
 gunicorn app:app --bind 0.0.0.0:$PORT --timeout 120 --workers 1
 ```
 
-**Environment Variables (필수):**
-
-| Key | Value |
-|-----|--------|
-| `USE_LIGHT_ML` | `1` |
-| `RENDER` | `true` |
-| `DATABASE_URL` | Neon 연결 문자열 (선택, 영구 저장용) |
-
 설정 저장 후 **Manual Deploy → Deploy latest commit** 다시 실행.
 
-### 배포가 실패해요 (기타)
-- Python 3.11 사용 (`runtime.txt` 참고)
-
 ### 15분 안 쓰면 느려져요 (무료 플랜)
-- Render 무료는 **슬립 모드** → 첫 접속 시 30초~1분 걸릴 수 있음  
-- 과제 제출 URL은 미리 한 번 열어 두기
+
+- Render 무료는 **슬립 모드** → 첫 접속 시 30초~1분 걸릴 수 있음
+- 발표·제출 전에 URL을 미리 한 번 열어 두기
+- (선택) [UptimeRobot](https://uptimerobot.com) 등으로 5분마다 `/health` 핑 → 슬립 완화 (무료 한도 내)
 
 ### 회원가입이 사라져요 (Render 무료)
+
 Render 무료는 서버 디스크가 임시라 **SQLite만으로는 재배포 시 데이터가 사라질 수 있습니다.**
 
 **영구 저장 (권장):** Neon PostgreSQL
@@ -118,10 +136,8 @@ Render 무료는 서버 디스크가 임시라 **SQLite만으로는 재배포 �
 1. https://neon.tech 가입 → **New Project**
 2. **Connection string** 전체 복사 (`postgresql://...`)
 3. Render → 서비스 → **Environment** → `DATABASE_URL` 붙여넣기 → **Save**
-4. 재배포 후 `/health` → `"database": "postgresql"` 확인
+4. 재배포 후 관리자 로그인 → `/health/detail` → `"database": "postgresql"` 확인
 5. 사이트에서 **새로 회원가입** 후 재로그인 테스트
-
-> DB 주소·비밀번호는 **GitHub에 올리지 마세요.** Render Environment에만 넣습니다.
 
 로컬 PC(`run.bat`)는 `data/emotionai.db`에 자동 저장됩니다.
 
@@ -146,13 +162,13 @@ Render가 자동으로 다시 배포합니다.
 
 **자동 배포가 안 될 때:** Render 대시보드 → 해당 서비스 → **Manual Deploy** → **Deploy latest commit**
 
-배포 반영 확인: `/health` 응답에 `"api_version": 2` 가 보이면 최신 코드입니다.
+배포 반영 확인: `/health`의 `api_version`이 이전과 다르면 최신 코드입니다.
 
 ### 모바일에서 "서버 연결에 실패했습니다"
 
 1. 브라우저에서 `https://본인주소.onrender.com/health` 를 먼저 열어 서버를 깨웁니다 (30~60초 대기).
-2. `/health` 에 `"api_version": 2` 가 없으면 Render에서 **Manual Deploy** 를 실행하세요.
-3. 회원가입 시 **「사진 촬영 / 선택」** 버튼으로 정면 얼굴 사진을 올립니다 (카메라 미리보기만으로는 실패할 수 있음).
+2. `/health`가 오래된 버전이면 Render에서 **Manual Deploy** 를 실행하세요.
+3. 회원가입 시 **「사진 촬영 / 선택」** 버튼으로 정면 얼굴 사진을 올립니다.
 4. Wi-Fi가 불안정하면 1분 정도 기다린 뒤 다시 시도합니다.
 
 ## 수동 배포 (Blueprint 없이)
@@ -162,12 +178,9 @@ Render가 자동으로 다시 배포합니다.
 3. 설정:
    - **Build Command:** `pip install -r requirements-deploy.txt`
    - **Start Command:** `gunicorn app:app --bind 0.0.0.0:$PORT --timeout 120 --workers 1`
-   - **Environment Variables:**
-     - `USE_LIGHT_ML` = `1`
-     - `RENDER` = `true`
-     - `SECRET_KEY` = (랜덤 긴 문자열)
+   - **Environment Variables:** 위 표 참고
 4. **Create Web Service**
 
 ---
 
-로컬 개발은 계속 `run.bat`을 사용하면 됩니다.
+로컬 개발은 `run.bat`을 사용하면 됩니다. 이메일 없이 가입 테스트: `set SKIP_EMAIL_VERIFICATION=1`

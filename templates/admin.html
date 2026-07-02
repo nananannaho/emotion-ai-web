@@ -38,10 +38,16 @@
   </section>
 
   <section class="admin-users-card glass">
-    <h3>가입자 목록</h3>
+    <div class="admin-users-toolbar">
+      <h3>가입자 목록</h3>
+      <label class="admin-search">
+        <span class="sr-only">가입자 검색</span>
+        <input type="search" id="adminUserSearch" placeholder="아이디·이메일·이름 검색" autocomplete="off">
+      </label>
+    </div>
     {% if users %}
     <div class="admin-user-table-wrap">
-      <table class="admin-user-table">
+      <table class="admin-user-table" id="adminUserTable">
         <thead>
           <tr>
             <th>아이디</th>
@@ -55,7 +61,7 @@
         </thead>
         <tbody>
           {% for user_item in users %}
-          <tr>
+          <tr data-search="{{ user_item.username }} {{ user_item.email }} {{ user_item.display_name }}">
             <td>{{ user_item.username }}</td>
             <td class="admin-user-email">{% if user_item.email %}{{ user_item.email }}{% else %}<span class="admin-user-muted">미등록</span>{% endif %}</td>
             <td>{{ user_item.display_name }}</td>
@@ -128,6 +134,16 @@
     adminStatusEl.textContent = msg || "";
     adminStatusEl.style.color = color;
   }
+
+  const adminSearchInput = document.getElementById("adminUserSearch");
+  const adminTableRows = document.querySelectorAll("#adminUserTable tbody tr");
+  adminSearchInput?.addEventListener("input", () => {
+    const q = (adminSearchInput.value || "").trim().toLowerCase();
+    adminTableRows.forEach((row) => {
+      const hay = (row.dataset.search || "").toLowerCase();
+      row.hidden = q ? !hay.includes(q) : false;
+    });
+  });
 
   document.querySelectorAll(".admin-password-btn").forEach((btn) => {
     btn.addEventListener("click", async () => {

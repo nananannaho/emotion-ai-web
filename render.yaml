@@ -18,3 +18,16 @@ services:
         value: "1"
       - key: RENDER
         value: "true"
+      # 아래는 Render 대시보드 → Environment 에서 직접 설정 (sync: false)
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: RESEND_OWNER_EMAIL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false

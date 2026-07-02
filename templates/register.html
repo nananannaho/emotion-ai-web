@@ -5,7 +5,10 @@
 <section class="auth-page">
   <div class="auth-card glass">
     <h2>회원가입</h2>
-    <p class="auth-sub">얼굴을 등록하면 다음부터 얼굴 인식으로 로그인할 수 있어요.</p>
+    <p class="auth-sub">이메일 인증을 완료하고 얼굴을 등록하면 다음부터 얼굴 인식으로 로그인할 수 있어요.</p>
+    {% if skip_email_verification %}
+    <p class="field-hint field-hint--dev">로컬 개발 모드: 이메일 인증 없이 가입할 수 있습니다.</p>
+    {% endif %}
     <form id="registerForm" class="auth-form">
       <label>
         <span>사용자 이름</span>
@@ -17,8 +20,22 @@
       </label>
       <label>
         <span>이메일</span>
-        <input type="email" name="email" required autocomplete="email" placeholder="연락용 이메일">
+        <input type="email" name="email" required autocomplete="email" placeholder="비밀번호 재설정에 사용할 이메일">
       </label>
+      {% if not skip_email_verification %}
+      <div class="auth-inline-actions">
+        <button type="button" id="sendSignupCodeBtn" class="btn btn-ghost btn-block">이메일로 인증번호 받기</button>
+      </div>
+      <p class="field-hint field-hint--email">메일이 오지 않으면 스팸·프로모션함을 확인해 주세요.</p>
+      <label>
+        <span>이메일 인증번호</span>
+        <input type="text" name="email_code" inputmode="numeric" maxlength="6" placeholder="메일로 받은 6자리 숫자">
+      </label>
+      <div class="auth-inline-actions">
+        <button type="button" id="verifySignupCodeBtn" class="btn btn-secondary btn-block">이메일 인증 확인</button>
+      </div>
+      <p id="registerEmailStatus" class="status-text"></p>
+      {% endif %}
       <label>
         <span>비밀번호</span>
         <div class="password-input-wrap">

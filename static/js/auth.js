@@ -57,8 +57,115 @@ const AuthHelper = (() => {
     const form = document.getElementById("registerForm");
     const status = document.getElementById("faceStatus");
     const emailInput = form?.querySelector('input[name="email"]');
+    const emailCodeInput = form?.querySelector('input[name="email_code"]');
+    const sendCodeBtn = document.getElementById("sendSignupCodeBtn");
+    const verifyCodeBtn = document.getElementById("verifySignupCodeBtn");
+    let verifiedEmail = "";
 
     const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+    const emailVerificationRequired = Boolean(sendCodeBtn && verifyCodeBtn);
+
+    emailInput?.addEventListener("input", () => {
+      if (!emailVerificationRequired) return;
+      const nextEmail = normalizeEmail(emailInput.value);
+      if (!nextEmail) {
+        verifiedEmail = "";
+        setStatus("registerEmailStatus", "");
+        return;
+      }
+      if (verifiedEmail && nextEmail !== verifiedEmail) {
+        verifiedEmail = "";
+        setStatus("registerEmailStatus", "이메일이 변경되어 다시 인증이 필요합니다.");
+      }
+    });
+
+    let signupCodeCooldownTimer = null;
+
+    function startSignupCodeCooldown(seconds = 45) {
+      if (!sendCodeBtn) return;
+      let remain = seconds;
+      sendCodeBtn.disabled = true;
+      const defaultLabel = sendCodeBtn.textContent;
+      const tick = () => {
+        if (remain <= 0) {
+          sendCodeBtn.disabled = false;
+          sendCodeBtn.textContent = defaultLabel;
+          signupCodeCooldownTimer = null;
+          return;
+        }
+        sendCodeBtn.textContent = `다시 받기 (${remain}초)`;
+        remain -= 1;
+        signupCodeCooldownTimer = window.setTimeout(tick, 1000);
+      };
+      tick();
+    }
+
+    sendCodeBtn?.addEventListener("click", async () => {
+      showError("registerError", "");
+      const email = normalizeEmail(emailInput?.value);
+      if (!email) {
+        showError("registerError", "이메일 주소를 먼저 입력해 주세요.");
+        emailInput?.focus();
+        return;
+      }
+      if (signupCodeCooldownTimer) return;
+      sendCodeBtn.disabled = true;
+      setStatus("registerEmailStatus", "인증번호를 보내는 중입니다...");
+      try {
+        const data = await postJson("/api/register/email-code/request", { email });
+        if (data.success) {
+          verifiedEmail = "";
+          setStatus(
+            "registerEmailStatus",
+            data.message || "입력한 이메일로 인증번호를 보냈습니다.",
+            "#8ec9b0"
+          );
+          emailCodeInput?.focus();
+          startSignupCodeCooldown(45);
+          return;
+        }
+        showError("registerError", data.error || "인증번호 요청에 실패했습니다.");
+        setStatus("registerEmailStatus", "");
+        sendCodeBtn.disabled = false;
+      } catch (err) {
+        showError("registerError", err.message || "서버 연결에 실패했습니다.");
+        setStatus("registerEmailStatus", "");
+        sendCodeBtn.disabled = false;
+      }
+    });
+
+    verifyCodeBtn?.addEventListener("click", async () => {
+      showError("registerError", "");
+      const email = normalizeEmail(emailInput?.value);
+      const code = String(emailCodeInput?.value || "").trim();
+      if (!email) {
+        showError("registerError", "이메일 주소를 먼저 입력해 주세요.");
+        emailInput?.focus();
+        return;
+      }
+      if (!code) {
+        showError("registerError", "이메일 인증번호를 입력해 주세요.");
+        emailCodeInput?.focus();
+        return;
+      }
+      verifyCodeBtn.disabled = true;
+      setStatus("registerEmailStatus", "인증번호를 확인하는 중입니다...");
+      try {
+        const data = await postJson("/api/register/email-code/verify", { email, code });
+        if (data.success) {
+          verifiedEmail = email;
+          setStatus("registerEmailStatus", data.message || "이메일 인증이 완료되었습니다.", "#8ec9b0");
+        } else {
+          showError("registerError", data.error || "이메일 인증에 실패했습니다.");
+          setStatus("registerEmailStatus", "");
+        }
+      } catch (err) {
+        showError("registerError", err.message || "서버 연결에 실패했습니다.");
+        setStatus("registerEmailStatus", "");
+      } finally {
+        verifyCodeBtn.disabled = false;
+      }
+    });
 
     captureBtn?.addEventListener("click", async () => {
       CameraHelper.clearGalleryCapture?.();
@@ -80,6 +187,10 @@ const AuthHelper = (() => {
       if (!normalizedEmail) {
         showError("registerError", "이메일 주소를 입력해 주세요.");
         emailInput?.focus();
+        return;
+      }
+      if (emailVerificationRequired && verifiedEmail !== normalizedEmail) {
+        showError("registerError", "이메일 인증을 완료해 주세요.");
         return;
       }
 

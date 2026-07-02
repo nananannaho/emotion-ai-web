@@ -7,5 +7,13 @@
   "background_color": "#0b1424",
   "theme_color": "#101c32",
   "orientation": "portrait-primary",
-  "lang": "ko"
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "/static/img/felunai-mark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
 }

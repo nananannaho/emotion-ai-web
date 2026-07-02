@@ -45,6 +45,7 @@ echo   모바일:  아래 서버 시작 후 표시되는
 echo            http://192.168.x.x:5000 주소
 echo            (같은 Wi-Fi 필요)
 echo   이 창을 닫으면 사이트가 꺼집니다.
+echo   로컬 가입 테스트: set SKIP_EMAIL_VERIFICATION=1
 echo ============================================
 echo.
 

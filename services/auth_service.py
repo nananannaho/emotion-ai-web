@@ -14,7 +14,9 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from config import (
     ADMIN_PASSWORD,
     ADMIN_USERNAME,
+    EMAIL_VERIFICATION_TTL_MINUTES,
     PASSWORD_RESET_TTL_MINUTES,
+    SKIP_EMAIL_VERIFICATION,
 )
 from models.face_encoder import FaceEncoder
 from services.database import get_db
@@ -22,6 +24,7 @@ from utils.password_validation import validate_password
 
 logger = logging.getLogger(__name__)
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+SIGNUP_EMAIL_VERIFICATION_PURPOSE = "signup"
 
 
 class AuthService:
@@ -39,6 +42,65 @@ class AuthService:
     @staticmethod
     def is_valid_email(email: str) -> bool:
         return bool(EMAIL_RE.match((email or "").strip()))
+
+    def _get_signup_email_verification(self, email: str) -> dict | None:
+        email = self.normalize_email(email)
+        if not email:
+            return None
+        record = self.db.get_email_verification_token(email, SIGNUP_EMAIL_VERIFICATION_PURPOSE)
+        if not record:
+            return None
+        expires_at = datetime.fromisoformat(str(record["expires_at"]))
+        if expires_at < datetime.now(timezone.utc):
+            return None
+        return record
+
+    def request_signup_email_verification(self, email: str) -> dict:
+        email = self.normalize_email(email)
+        if not self.is_valid_email(email):
+            return {"success": False, "error": "올바른 이메일 주소를 입력해 주세요."}
+        if self.db.email_exists(email):
+            return {"success": False, "error": "이미 가입된 이메일입니다."}
+
+        verification_code = f"{secrets.randbelow(1000000):06d}"
+        code_hash = hashlib.sha256(verification_code.encode("utf-8")).hexdigest()
+        expires_at = (
+            datetime.now(timezone.utc) + timedelta(minutes=EMAIL_VERIFICATION_TTL_MINUTES)
+        ).isoformat()
+        self.db.save_email_verification_token(
+            email=email,
+            purpose=SIGNUP_EMAIL_VERIFICATION_PURPOSE,
+            code_hash=code_hash,
+            expires_at=expires_at,
+        )
+        return {
+            "success": True,
+            "email_sent": True,
+            "email": email,
+            "verification_code": verification_code,
+            "expires_at": expires_at,
+        }
+
+    def verify_signup_email_code(self, email: str, code: str) -> dict:
+        email = self.normalize_email(email)
+        code = (code or "").strip()
+        if not self.is_valid_email(email):
+            return {"success": False, "error": "올바른 이메일 주소를 입력해 주세요."}
+        if not code:
+            return {"success": False, "error": "이메일 인증번호를 입력해 주세요."}
+        if self.db.email_exists(email):
+            return {"success": False, "error": "이미 가입된 이메일입니다."}
+
+        record = self._get_signup_email_verification(email)
+        if not record:
+            return {"success": False, "error": "인증번호를 먼저 요청하거나 다시 요청해 주세요."}
+
+        code_hash = hashlib.sha256(code.encode("utf-8")).hexdigest()
+        if code_hash != record.get("code_hash"):
+            return {"success": False, "error": "이메일 인증번호가 올바르지 않습니다."}
+
+        self.db.mark_email_verification_verified(email, SIGNUP_EMAIL_VERIFICATION_PURPOSE)
+        return {"success": True, "message": "이메일 인증이 완료되었습니다."}
 
     def _find_face_conflict(
         self,
@@ -90,6 +152,14 @@ class AuthService:
             logger.exception("email_exists 실패: %s", exc)
             return {"success": False, "error": "데이터베이스 연결 오류입니다. 잠시 후 다시 시도해 주세요."}
 
+        try:
+            verification = self._get_signup_email_verification(email)
+        except Exception as exc:
+            logger.exception("이메일 인증 조회 실패: %s", exc)
+            return {"success": False, "error": "이메일 인증 확인 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."}
+        if not SKIP_EMAIL_VERIFICATION and (not verification or not verification.get("verified_at")):
+            return {"success": False, "error": "이메일 인증을 완료해 주세요."}
+
         pwd_err = validate_password(password)
         if pwd_err:
             return {"success": False, "error": pwd_err}
@@ -137,21 +207,29 @@ class AuthService:
                 "success": False,
                 "error": "가입 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.",
             }
+        self.db.delete_email_verification_tokens(email, SIGNUP_EMAIL_VERIFICATION_PURPOSE)
         return {"success": True, "username": username}
 
     def login_password(self, username: str, password: str) -> dict:
-        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-            return {
-                "success": True,
-                "is_admin": True,
-                "redirect_to": "/admin",
-                "profile": {
-                    "username": ADMIN_USERNAME,
-                    "display_name": "관리자",
-                    "preferences": {},
-                    "mood_history": [],
-                },
-            }
+        if username == ADMIN_USERNAME:
+            if not ADMIN_PASSWORD:
+                return {
+                    "success": False,
+                    "error": "관리자 비밀번호가 설정되지 않았습니다. 서버 환경변수를 확인해 주세요.",
+                }
+            if password == ADMIN_PASSWORD:
+                return {
+                    "success": True,
+                    "is_admin": True,
+                    "redirect_to": "/admin",
+                    "profile": {
+                        "username": ADMIN_USERNAME,
+                        "display_name": "관리자",
+                        "preferences": {},
+                        "mood_history": [],
+                    },
+                }
+            return {"success": False, "error": "비밀번호가 올바르지 않습니다."}
         profile = self.db.get_user_full(username)
         if not profile:
             return {"success": False, "error": "사용자를 찾을 수 없습니다."}
