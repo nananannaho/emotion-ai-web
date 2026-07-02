@@ -28,9 +28,12 @@ cd "프로젝트 폴더"
 python -m venv venv
 .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-python init_models.py
 python app.py
 ```
+
+`requirements.txt`는 TensorFlow 없는 **경량 패키지**입니다 (~200MB). CNN 학습이 필요할 때만 `pip install -r requirements-dev.txt` 를 추가 설치하세요.
+
+디스크 정리: `로컬-정리.bat` (venv·학습 데이터·캐시 삭제)
 
 ### 로컬 개발 팁
 
@@ -40,7 +43,7 @@ python app.py
 ## 테스트
 
 ```powershell
-pip install pytest
+pip install -r requirements-dev.txt
 pytest
 ```
 

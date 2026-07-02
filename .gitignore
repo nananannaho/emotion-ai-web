@@ -13,6 +13,7 @@ data/emotions/*/*
 !data/emotions/README.md
 !data/emotions/*/.gitkeep
 weights/*.keras
+weights/emotion_clf.joblib.bak
 weights/haarcascade*.xml
 .DS_Store
 *.log

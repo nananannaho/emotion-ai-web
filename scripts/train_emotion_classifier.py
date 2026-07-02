@@ -163,12 +163,12 @@ def main():
         X, y, test_size=0.15, random_state=42, stratify=y
     )
 
-    # GitHub 파일 100MB 제한 — 트리 수·깊이를 제한해 joblib 크기 유지
+    # GitHub 100MB 제한 — 트리·깊이·클래스당 샘플을 제한해 joblib 크기 유지
     clf = RandomForestClassifier(
-        n_estimators=120,
-        max_depth=18,
+        n_estimators=80,
+        max_depth=16,
         max_features="sqrt",
-        min_samples_leaf=3,
+        min_samples_leaf=4,
         class_weight="balanced_subsample",
         random_state=42,
         n_jobs=-1,
@@ -194,7 +194,7 @@ def main():
             "n_samples": int(len(y)),
         },
         OUT_PATH,
-        compress=3,
+        compress=9,
     )
     size_mb = OUT_PATH.stat().st_size / (1024 * 1024)
     print(f"\n저장 완료: {OUT_PATH} ({size_mb:.1f} MB)")
