@@ -1,0 +1,4 @@
+# 로컬 CNN 학습·pytest (TensorFlow 포함, 용량 큼)
+-r requirements-deploy.txt
+tensorflow>=2.20.0
+pytest>=8.0.0
