@@ -18,7 +18,22 @@ for directory in (DATA_DIR, WEIGHTS_DIR, LEGACY_USERS_DIR, LEGACY_FACES_DIR):
 SECRET_KEY = os.environ.get("SECRET_KEY", "emotion-ai-club-dev-key-change-in-production")
 MAX_CONTENT_LENGTH = 8 * 1024 * 1024
 ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "felunai").strip()
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "felunai@@1.").strip()
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "").strip()
+
+USE_LIGHT_ML = os.environ.get("USE_LIGHT_ML", "").lower() in ("1", "true", "yes")
+IS_CLOUD = bool(os.environ.get("RENDER") or os.environ.get("RAILWAY_ENVIRONMENT"))
+
+# 클라우드에서는 ADMIN_PASSWORD 환경변수 필수. 로컬만 개발용 기본값 허용.
+if not ADMIN_PASSWORD and not IS_CLOUD:
+    ADMIN_PASSWORD = "felunai@@1."
+
+SKIP_EMAIL_VERIFICATION = os.environ.get("SKIP_EMAIL_VERIFICATION", "1").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+RATE_LIMIT_ENABLED = os.environ.get("RATE_LIMIT_ENABLED", "1").lower() in ("1", "true", "yes")
+API_VERSION = 17
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
 RESEND_API_BASE = os.environ.get("RESEND_API_BASE", "https://api.resend.com").strip().rstrip("/")
 RESEND_OWNER_EMAIL = os.environ.get("RESEND_OWNER_EMAIL", "").strip().lower()
@@ -39,8 +54,6 @@ GEMINI_TIMEOUT_SECONDS = int(os.environ.get("GEMINI_TIMEOUT_SECONDS", "45"))
 
 FELUNAI_CONTACT_EMAIL = os.environ.get("FELUNAI_CONTACT_EMAIL", "felunai.mail@gmail.com").strip()
 
-USE_LIGHT_ML = os.environ.get("USE_LIGHT_ML", "").lower() in ("1", "true", "yes")
-IS_CLOUD = bool(os.environ.get("RENDER") or os.environ.get("RAILWAY_ENVIRONMENT"))
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 DB_PATH = DATA_DIR / "emotionai.db"
 

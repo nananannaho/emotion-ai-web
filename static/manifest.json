@@ -4,8 +4,16 @@
   "description": "표정 인식과 감정 맞춤 대화를 연결하는 AI 서비스",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0b1424",
-  "theme_color": "#101c32",
+  "background_color": "#000000",
+  "theme_color": "#08060f",
   "orientation": "portrait-primary",
-  "lang": "ko"
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "/static/img/felunai-mark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
 }

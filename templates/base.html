@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5">
-  <meta name="theme-color" content="#060a12">
+  <meta name="theme-color" content="#08060f">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="mobile-web-app-capable" content="yes">
@@ -31,7 +31,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=23">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=27">
   <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -46,11 +46,13 @@
 </head>
 <body>
   <div class="bg-gradient"></div>
+  <div class="bg-grid"></div>
   <div class="bg-orbs">
     <span class="orb orb-1"></span>
     <span class="orb orb-2"></span>
     <span class="orb orb-3"></span>
   </div>
+  <div class="bg-vignette"></div>
 
   {% block navbar %}
   <nav class="navbar">
@@ -62,7 +64,7 @@
       <div class="nav-links">
         <a href="/">홈</a>
         <a href="/login">로그인</a>
-        <a href="/register" class="btn-nav">시작하기</a>
+        <a href="/register" class="btn-nav">무료로 시작하기</a>
       </div>
       <div class="navbar-toolbar">
         <button type="button" id="openGuideBtn" class="nav-guide-btn">이용 방법</button>
@@ -80,6 +82,9 @@
 
   <footer class="footer">
     <p>Felunai · 표정 기반 감정 대화 플랫폼</p>
+    <p class="footer-links">
+      <a href="/privacy">개인정보처리방침</a>
+    </p>
     {% if felunai_contact_email %}
     <p class="footer-contact">
       <span class="footer-contact--static">{{ felunai_contact_email }}</span>

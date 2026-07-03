@@ -4,8 +4,8 @@
 {% block navbar %}
 <nav class="navbar navbar--app" data-nav-mode="app">
   <a href="/dashboard" class="logo">
-    <span class="logo-icon">◈</span>
-    <span>Emotion<strong>AI</strong></span>
+    <img src="{{ url_for('static', filename='img/felunai-mark.svg') }}" alt="Felunai 로고" class="logo-icon logo-icon-image">
+    <span class="logo-wordmark">Felun<strong>ai</strong></span>
   </a>
   <div class="navbar-right">
     <div class="navbar-toolbar">
@@ -32,15 +32,15 @@
     <hr class="nav-drawer-divider">
     <h3 class="nav-drawer-section-title">계정 탈퇴</h3>
     <p class="account-settings-desc">
-      서비스를 그만두시려면 비밀번호를 입력한 뒤 계정을 삭제할 수 있습니다. 얼굴·대화 기록이 모두 제거됩니다.
+      서비스를 그만두시려면 가입 시 등록한 이메일을 입력한 뒤 계정을 삭제할 수 있습니다. 얼굴·대화 기록이 모두 제거됩니다.
     </p>
-    <label class="account-delete-label" for="deleteAccountPassword">비밀번호 확인</label>
+    <label class="account-delete-label" for="deleteAccountEmail">이메일 확인</label>
     <input
-      type="password"
-      id="deleteAccountPassword"
+      type="email"
+      id="deleteAccountEmail"
       class="account-delete-input account-delete-input--drawer"
-      autocomplete="current-password"
-      placeholder="비밀번호"
+      autocomplete="email"
+      placeholder="가입 시 등록한 이메일"
     >
     <button type="button" id="deleteAccountBtn" class="btn btn-ghost btn-danger touch-btn btn-block">
       계정 탈퇴
@@ -57,6 +57,10 @@
       <h2>안녕하세요, <span id="displayName">{{ user }}</span>님</h2>
       <p class="dash-sub">표정을 분석한 뒤 채팅하면 감정에 맞는 답변을 받을 수 있어요.</p>
     </div>
+    <aside id="moodHistoryPanel" class="mood-history-panel glass" hidden aria-label="최근 감정 기록">
+      <h3 class="mood-history-title">최근 감정</h3>
+      <div id="moodHistoryList" class="mood-history-list"></div>
+    </aside>
   </header>
 
   <div class="dash-layout">
@@ -64,7 +68,6 @@
       <div class="camera-wrap dash-camera">
         <video id="dashVideo" autoplay playsinline muted></video>
         <canvas id="dashCanvas" hidden></canvas>
-        <div id="faceOverlay" class="face-overlay" hidden></div>
         <div id="liveEmotionChip" class="live-emotion-chip" hidden>
           <span id="liveEmotionEmoji" class="chip-emoji" aria-hidden="true"></span>
           <span id="liveEmotionLabel"></span>
@@ -102,6 +105,7 @@
           <button type="button" class="emotion-choice-btn" data-emotion="angry">😤 분노</button>
           <button type="button" class="emotion-choice-btn" data-emotion="fear">😰 불안</button>
           <button type="button" class="emotion-choice-btn" data-emotion="surprise">😲 놀람</button>
+          <button type="button" class="emotion-choice-btn" data-emotion="disgust">😣 혐오</button>
           <button type="button" class="emotion-choice-btn" data-emotion="neutral">😌 평온</button>
         </div>
       </section>
@@ -144,5 +148,5 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/camera.js') }}"></script>
-<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=12"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=15"></script>
 {% endblock %}

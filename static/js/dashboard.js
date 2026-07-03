@@ -179,10 +179,74 @@
       const data = await res.json();
       if (data.logged_in && data.profile) {
         document.getElementById("displayName").textContent = data.profile.display_name;
+        renderMoodHistory(data.profile.mood_history || []);
+        restoreChatHistory(data.chat_history || []);
       }
     } catch (_) {
       /* ignore */
     }
+  }
+
+  function prependMoodChip(emotion) {
+    const panel = document.getElementById("moodHistoryPanel");
+    const list = document.getElementById("moodHistoryList");
+    if (!panel || !list || !emotion) return;
+    panel.hidden = false;
+    const chip = document.createElement("span");
+    chip.className = "mood-chip";
+    chip.textContent = `${EMOTION_EMOJI[emotion] || "💬"} ${EMOTION_KO[emotion] || emotion}`;
+    list.prepend(chip);
+    while (list.children.length > 8) {
+      list.removeChild(list.lastChild);
+    }
+  }
+
+  function renderMoodHistory(moods) {
+    const panel = document.getElementById("moodHistoryPanel");
+    const list = document.getElementById("moodHistoryList");
+    if (!panel || !list) return;
+
+    const recent = moods.slice(-8).reverse();
+    if (!recent.length) {
+      panel.hidden = true;
+      list.innerHTML = "";
+      return;
+    }
+
+    panel.hidden = false;
+    list.innerHTML = recent
+      .map((emo) => {
+        const label = EMOTION_KO[emo] || emo;
+        const emoji = EMOTION_EMOJI[emo] || "💬";
+        return `<span class="mood-chip">${emoji} ${escapeHtml(label)}</span>`;
+      })
+      .join("");
+  }
+
+  function restoreChatHistory(history) {
+    if (!history.length) return;
+
+    const box = getChatBox();
+    const typing = getTypingEl();
+    if (!box) return;
+
+    box.querySelectorAll(".msg:not(.chat-typing)").forEach((node) => node.remove());
+
+    history.forEach((item) => {
+      const content = (item.content || "").trim();
+      if (!content) return;
+      if (item.role === "user") {
+        appendUserMessage(content);
+      } else if (item.role === "assistant") {
+        appendBotMessage(content);
+      }
+    });
+
+    if (typing && typing.parentElement !== box) {
+      box.appendChild(typing);
+    }
+    ensureTypingAtBottom();
+    scrollChatToBottom();
   }
 
   function showFaceBox(box) {
@@ -216,6 +280,7 @@
     lastAnalyzeAt = Date.now();
     updateLiveChip(visual, fusion, revealChip);
     showFaceBox(visual.face_box);
+    prependMoodChip(fusion?.fused_emotion || visual.emotion);
     const label =
       fusion.fused_emotion_ko ||
       visual.emotion_ko ||
@@ -408,10 +473,10 @@
   });
 
   document.getElementById("deleteAccountBtn")?.addEventListener("click", async () => {
-    const pwInput = document.getElementById("deleteAccountPassword");
+    const emailInput = document.getElementById("deleteAccountEmail");
     const errEl = document.getElementById("deleteAccountError");
     const btn = document.getElementById("deleteAccountBtn");
-    const password = pwInput?.value || "";
+    const email = String(emailInput?.value || "").trim();
 
     if (errEl) {
       errEl.hidden = true;
@@ -426,9 +491,18 @@
       return;
     }
 
+    if (!email) {
+      if (errEl) {
+        errEl.hidden = false;
+        errEl.textContent = "이메일 주소를 입력해 주세요.";
+      }
+      emailInput?.focus();
+      return;
+    }
+
     if (btn) btn.disabled = true;
     try {
-      const data = await postJson("/api/account/delete", { password });
+      const data = await postJson("/api/account/delete", { email });
       if (data.success) {
         window.location.href = "/";
         return;

@@ -460,14 +460,18 @@ class AuthService:
             return {"success": False, "error": "계정 삭제 중 오류가 발생했습니다."}
         return {"success": True, "message": f"{username} 계정을 삭제했습니다."}
 
-    def delete_account(self, username: str, password: str) -> dict:
+    def delete_account(self, username: str, email: str) -> dict:
         profile = self.db.get_user_full(username)
         if not profile:
             return {"success": False, "error": "사용자를 찾을 수 없습니다."}
-        if not password:
-            return {"success": False, "error": "비밀번호를 입력해 주세요."}
-        if not check_password_hash(profile["password_hash"], password):
-            return {"success": False, "error": "비밀번호가 올바르지 않습니다."}
+        email = self.normalize_email(email)
+        if not email:
+            return {"success": False, "error": "이메일 주소를 입력해 주세요."}
+        if not self.is_valid_email(email):
+            return {"success": False, "error": "올바른 이메일 주소를 입력해 주세요."}
+        profile_email = self.normalize_email(profile.get("email", ""))
+        if email != profile_email:
+            return {"success": False, "error": "가입 시 등록한 이메일과 일치하지 않습니다."}
         try:
             self.db.delete_user(username)
         except Exception as exc:

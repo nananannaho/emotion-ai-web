@@ -16,6 +16,35 @@ logger = logging.getLogger(__name__)
 CLF_PATH = WEIGHTS_DIR / "emotion_clf.joblib"
 
 
+class ThinRandomForest:
+    """RandomForest 트리 일부만 보관해 joblib 용량을 줄인 래퍼."""
+
+    def __init__(self, trees, classes: np.ndarray, n_features: int):
+        self.estimators_ = list(trees)
+        self.classes_ = np.asarray(classes)
+        self.n_features_in_ = int(n_features)
+        self.n_classes_ = len(self.classes_)
+
+    @classmethod
+    def from_random_forest(cls, rf, n_trees: int) -> "ThinRandomForest":
+        trees = rf.estimators_[:n_trees]
+        return cls(trees, rf.classes_, rf.n_features_in_)
+
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        preds = np.array([t.predict(X) for t in self.estimators_])
+        n = X.shape[0]
+        out = np.zeros((n, self.n_classes_), dtype=np.float64)
+        weight = 1.0 / len(self.estimators_)
+        for i in range(n):
+            vals, cnts = np.unique(preds[:, i], return_counts=True)
+            for val, cnt in zip(vals, cnts):
+                out[i, int(val)] = cnt * weight
+        return out
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        return self.classes_[np.argmax(self.predict_proba(X), axis=1)]
+
+
 class EmotionMLClassifier:
     def __init__(self):
         self._model = None
