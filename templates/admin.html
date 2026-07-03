@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}관리자{% endblock %}
+{% block head %}<meta name="robots" content="noindex,nofollow">{% endblock %}
+
+{% block navbar %}
+<nav class="navbar navbar--app">
+  <a href="/admin" class="logo">
+    <img src="{{ url_for('static', filename='img/felunai-mark.svg') }}" alt="Felunai 로고" class="logo-icon logo-icon-image">
+    <span class="logo-wordmark">Felun<strong>ai</strong></span>
+  </a>
+  <div class="navbar-right">
+    <div class="navbar-toolbar">
+      <button type="button" id="adminLogoutBtn" class="btn btn-ghost">로그아웃</button>
+    </div>
+  </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<section class="admin-page">
+  <header class="admin-header">
+    <article class="admin-hero glass">
+      <p class="admin-hero-eyebrow">Administrator Console</p>
+      <h2>환영합니다 관리자님.</h2>
+      <p class="admin-sub">Felunai 운영 현황을 차분하게 확인하고, 필요할 때만 계정과 재설정 요청을 관리할 수 있습니다.</p>
+    </article>
+  </header>
+
+  <section class="admin-summary-grid">
+    <article class="admin-stat-card glass">
+      <h3>전체 가입자</h3>
+      <strong>{{ total_users }}</strong>
+    </article>
+    <article class="admin-stat-card glass">
+      <h3>최근 가입 계정</h3>
+      <strong>{% if users %}{{ users[0].username }}{% else %}-{% endif %}</strong>
+    </article>
+  </section>
+
+  <section class="admin-users-card glass">
+    <h3>가입자 목록</h3>
+    {% if users %}
+    <div class="admin-user-table-wrap">
+      <table class="admin-user-table">
+        <thead>
+          <tr>
+            <th>아이디</th>
+            <th>가입 이메일</th>
+            <th>표시 이름</th>
+            <th>가입 시각</th>
+            <th>감정 기록 수</th>
+            <th>대화 수</th>
+            <th>관리</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for user_item in users %}
+          <tr>
+            <td>{{ user_item.username }}</td>
+            <td class="admin-user-email">{% if user_item.email %}{{ user_item.email }}{% else %}<span class="admin-user-muted">미등록</span>{% endif %}</td>
+            <td>{{ user_item.display_name }}</td>
+            <td>{{ user_item.created_at }}</td>
+            <td>{{ user_item.mood_count }}</td>
+            <td>{{ user_item.chat_count }}</td>
+            <td>
+              <button
+                type="button"
+                class="btn btn-ghost btn-danger admin-delete-btn"
+                data-username="{{ user_item.username }}"
+              >
+                계정 삭제
+              </button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p id="adminUserActionStatus" class="status-text"></p>
+    <p id="adminUserActionError" class="error-text" hidden></p>
+    {% else %}
+    <p class="admin-user-empty">아직 가입한 사용자가 없습니다.</p>
+    {% endif %}
+  </section>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const adminStatusEl = document.getElementById("adminUserActionStatus");
+  const adminErrorEl = document.getElementById("adminUserActionError");
+
+  document.getElementById("adminLogoutBtn")?.addEventListener("click", async () => {
+    await fetch("/api/logout", { method: "POST" });
+    window.location.href = "/login";
+  });
+
+  document.querySelectorAll(".admin-delete-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const username = btn.dataset.username;
+      if (!username) return;
+      if (!window.confirm(`${username} 계정을 삭제할까요?\n얼굴 데이터와 대화 기록도 함께 삭제됩니다.`)) {
+        return;
+      }
+      if (adminErrorEl) {
+        adminErrorEl.hidden = true;
+        adminErrorEl.textContent = "";
+      }
+      if (adminStatusEl) {
+        adminStatusEl.textContent = "계정을 삭제하는 중입니다...";
+        adminStatusEl.style.color = "";
+      }
+      btn.disabled = true;
+      try {
+        const res = await fetch("/api/admin/users/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (adminStatusEl) {
+            adminStatusEl.textContent = data.message || "계정을 삭제했습니다.";
+            adminStatusEl.style.color = "#8ec9b0";
+          }
+          setTimeout(() => window.location.reload(), 500);
+          return;
+        }
+        if (adminErrorEl) {
+          adminErrorEl.hidden = false;
+          adminErrorEl.textContent = data.error || "계정 삭제에 실패했습니다.";
+        }
+        if (adminStatusEl) adminStatusEl.textContent = "";
+      } catch (err) {
+        if (adminErrorEl) {
+          adminErrorEl.hidden = false;
+          adminErrorEl.textContent = err.message || "서버 연결에 실패했습니다.";
+        }
+        if (adminStatusEl) adminStatusEl.textContent = "";
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+</script>
+{% endblock %}

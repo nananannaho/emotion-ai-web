@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5">
+  <meta name="theme-color" content="#060a12">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="format-detection" content="telephone=no">
+  {% set site_name = "Felunai" %}
+  {% set site_description = "표정 인식과 감정 맞춤 대화를 연결하는 세련된 AI 커뮤니케이션 서비스" %}
+  {% set canonical_url = request.base_url %}
+  <title>{% block title %}Felunai{% endblock %} | 정제된 감정 대화 경험</title>
+  <meta name="description" content="{{ site_description }}">
+  <meta name="keywords" content="Felunai, 감정 AI, 표정 인식, 감정 챗봇, 얼굴 로그인">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <link rel="canonical" href="{{ canonical_url }}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{ site_name }}">
+  <meta property="og:title" content="{{ site_name }} | 정제된 감정 대화 경험">
+  <meta property="og:description" content="{{ site_description }}">
+  <meta property="og:url" content="{{ canonical_url }}">
+  <meta property="og:image" content="{{ url_for('static', filename='img/felunai-mark.svg', _external=True) }}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ site_name }} | 정제된 감정 대화 경험">
+  <meta name="twitter:description" content="{{ site_description }}">
+  <meta name="twitter:image" content="{{ url_for('static', filename='img/felunai-mark.svg', _external=True) }}">
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/felunai-mark.svg') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=23">
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "{{ site_name }}",
+      "url": "{{ request.url_root.rstrip('/') }}",
+      "description": "{{ site_description }}",
+      "inLanguage": "ko-KR"
+    }
+  </script>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <div class="bg-gradient"></div>
+  <div class="bg-orbs">
+    <span class="orb orb-1"></span>
+    <span class="orb orb-2"></span>
+    <span class="orb orb-3"></span>
+  </div>
+
+  {% block navbar %}
+  <nav class="navbar">
+    <a href="/" class="logo">
+      <img src="{{ url_for('static', filename='img/felunai-mark.svg') }}" alt="Felunai 로고" class="logo-icon logo-icon-image">
+      <span class="logo-wordmark">Felun<strong>ai</strong></span>
+    </a>
+    <div class="navbar-right">
+      <div class="nav-links">
+        <a href="/">홈</a>
+        <a href="/login">로그인</a>
+        <a href="/register" class="btn-nav">시작하기</a>
+      </div>
+      <div class="navbar-toolbar">
+        <button type="button" id="openGuideBtn" class="nav-guide-btn">이용 방법</button>
+        <button type="button" class="nav-toggle" aria-label="메뉴 열기" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </nav>
+  {% endblock %}
+
+  <main class="main-content">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer">
+    <p>Felunai · 표정 기반 감정 대화 플랫폼</p>
+    {% if felunai_contact_email %}
+    <p class="footer-contact">
+      <span class="footer-contact--static">{{ felunai_contact_email }}</span>
+      <a href="mailto:{{ felunai_contact_email }}" class="footer-contact--link">{{ felunai_contact_email }}</a>
+    </p>
+    {% endif %}
+  </footer>
+
+  <div id="guideModal" class="guide-modal" hidden aria-hidden="true">
+    <div class="guide-modal-backdrop" data-guide-close aria-hidden="true"></div>
+    <div
+      class="guide-modal-panel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="guideTitle"
+      tabindex="-1"
+    >
+      <button type="button" class="guide-modal-close" data-guide-close aria-label="닫기">×</button>
+      <h2 id="guideTitle">이용 방법</h2>
+      <ol class="guide-steps">
+        <li>
+          <span class="guide-step-num">1</span>
+          <div>
+            <strong>회원가입 · 얼굴 등록</strong>
+            <p>가입 시 정면 얼굴을 등록해 주세요. 이후 얼굴로 로그인할 수 있습니다.</p>
+          </div>
+        </li>
+        <li>
+          <span class="guide-step-num">2</span>
+          <div>
+            <strong>표정 분석</strong>
+            <p>대시보드에서 <em>표정 분석</em> 또는 <em>표정 반영</em>을 눌러 현재 표정을 읽습니다.</p>
+          </div>
+        </li>
+        <li>
+          <span class="guide-step-num">3</span>
+          <div>
+            <strong>챗봇 대화</strong>
+            <p>메시지를 내면 분석된 감정에 맞는 이모티콘과 답변을 받을 수 있습니다.</p>
+          </div>
+        </li>
+      </ol>
+      <p class="guide-tip">카메라가 안 되면 <strong>사진</strong> 버튼으로 얼굴 사진을 선택해 주세요.</p>
+      <button type="button" class="btn btn-primary btn-block touch-btn" data-guide-close>확인</button>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/api.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/guide-modal.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/mobile-nav.js') }}?v=10" defer></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

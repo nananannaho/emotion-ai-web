@@ -1,0 +1,11 @@
+# Cloud deploy (Render) — no TensorFlow, saves memory
+flask>=3.0.0,<4
+werkzeug>=3.0.0
+gunicorn>=22.0.0
+numpy>=1.24.0,<2.3
+opencv-python-headless==4.10.0.84
+Pillow>=10.0.0
+psycopg2-binary>=2.9.0
+scikit-learn>=1.3.0
+joblib>=1.3.0
+google-generativeai>=0.8.0

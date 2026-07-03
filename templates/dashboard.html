@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}대시보드{% endblock %}
+
+{% block navbar %}
+<nav class="navbar navbar--app" data-nav-mode="app">
+  <a href="/dashboard" class="logo">
+    <span class="logo-icon">◈</span>
+    <span>Emotion<strong>AI</strong></span>
+  </a>
+  <div class="navbar-right">
+    <div class="navbar-toolbar">
+      <button type="button" id="openGuideBtn" class="nav-guide-btn">이용 방법</button>
+      <button type="button" class="nav-toggle" aria-label="메뉴 열기" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<div id="navDrawer" class="nav-drawer" hidden aria-hidden="true">
+  <div class="nav-drawer-backdrop" data-nav-close tabindex="-1" aria-hidden="true"></div>
+  <aside class="nav-drawer-panel" role="dialog" aria-modal="true" aria-labelledby="navDrawerTitle" tabindex="-1">
+    <header class="nav-drawer-header">
+      <h2 id="navDrawerTitle">메뉴</h2>
+      <button type="button" class="nav-drawer-close" data-nav-close aria-label="닫기">×</button>
+    </header>
+    <div class="nav-drawer-actions">
+      <button type="button" id="logoutBtn" class="btn btn-ghost touch-btn btn-block">
+        로그아웃
+      </button>
+    </div>
+    <hr class="nav-drawer-divider">
+    <h3 class="nav-drawer-section-title">계정 탈퇴</h3>
+    <p class="account-settings-desc">
+      서비스를 그만두시려면 비밀번호를 입력한 뒤 계정을 삭제할 수 있습니다. 얼굴·대화 기록이 모두 제거됩니다.
+    </p>
+    <label class="account-delete-label" for="deleteAccountPassword">비밀번호 확인</label>
+    <input
+      type="password"
+      id="deleteAccountPassword"
+      class="account-delete-input account-delete-input--drawer"
+      autocomplete="current-password"
+      placeholder="비밀번호"
+    >
+    <button type="button" id="deleteAccountBtn" class="btn btn-ghost btn-danger touch-btn btn-block">
+      계정 탈퇴
+    </button>
+    <p id="deleteAccountError" class="error-text" hidden></p>
+  </aside>
+</div>
+{% endblock %}
+
+{% block content %}
+<section class="dashboard">
+  <header class="dash-header">
+    <div>
+      <h2>안녕하세요, <span id="displayName">{{ user }}</span>님</h2>
+      <p class="dash-sub">표정을 분석한 뒤 채팅하면 감정에 맞는 답변을 받을 수 있어요.</p>
+    </div>
+  </header>
+
+  <div class="dash-layout">
+    <div class="dash-camera-sticky glass">
+      <div class="camera-wrap dash-camera">
+        <video id="dashVideo" autoplay playsinline muted></video>
+        <canvas id="dashCanvas" hidden></canvas>
+        <div id="faceOverlay" class="face-overlay" hidden></div>
+        <div id="liveEmotionChip" class="live-emotion-chip" hidden>
+          <span id="liveEmotionEmoji" class="chip-emoji" aria-hidden="true"></span>
+          <span id="liveEmotionLabel"></span>
+          <span id="liveEmotionConf" class="confidence"></span>
+        </div>
+      </div>
+      <p id="dashStatus" class="status-text dash-status" hidden aria-live="polite"></p>
+      <div class="dash-actions-row">
+        <button type="button" id="analyzeBtn" class="btn btn-secondary touch-btn">표정 분석</button>
+        <button type="button" id="galleryAnalyzeBtn" class="btn btn-ghost touch-btn">사진</button>
+        <button type="button" id="refaceBtn" class="btn btn-ghost touch-btn">얼굴 재등록</button>
+      </div>
+      <input type="file" id="galleryAnalyzeInput" accept="image/*" capture="user" hidden>
+    </div>
+
+    <section class="panel chat-panel glass">
+      <header class="chat-panel-header">
+        <h3>AI 챗봇</h3>
+        <div id="chatEmotionBadge" class="chat-emotion-badge" hidden>
+          <span id="chatEmotionEmoji" aria-hidden="true"></span>
+          <span id="chatEmotionLabel">평온</span>
+        </div>
+      </header>
+
+      <section class="manual-emotion-picker" aria-label="기분 직접 선택">
+        <div class="manual-emotion-header">
+          <strong>기분 직접 선택</strong>
+          <button type="button" id="clearEmotionChoiceBtn" class="manual-emotion-clear" hidden>
+            자동으로 되돌리기
+          </button>
+        </div>
+        <div class="manual-emotion-options">
+          <button type="button" class="emotion-choice-btn" data-emotion="happy">😊 기쁨</button>
+          <button type="button" class="emotion-choice-btn" data-emotion="sad">😢 슬픔</button>
+          <button type="button" class="emotion-choice-btn" data-emotion="angry">😤 분노</button>
+          <button type="button" class="emotion-choice-btn" data-emotion="fear">😰 불안</button>
+          <button type="button" class="emotion-choice-btn" data-emotion="surprise">😲 놀람</button>
+          <button type="button" class="emotion-choice-btn" data-emotion="neutral">😌 평온</button>
+        </div>
+      </section>
+
+      <div class="chat-scroll-wrap">
+        <div id="chatMessages" class="chat-messages" role="log" aria-live="polite">
+          <div class="msg bot">
+            <span class="msg-avatar" aria-hidden="true">🤖</span>
+            <div class="msg-body">
+              <p>😌 안녕하세요! 먼저 <strong>표정 분석</strong>을 누르거나, 아래 <strong>표정 반영</strong>을 눌러 주세요. 그다음 메시지를 내면 지금 기분에 맞게 답해 드릴게요.</p>
+            </div>
+          </div>
+          <div id="chatTyping" class="msg bot chat-typing" hidden aria-hidden="true">
+            <span class="msg-avatar" aria-hidden="true">🤖</span>
+            <div class="msg-body typing-body">
+              <span class="typing-dots"><span></span><span></span><span></span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <form id="chatForm" class="chat-form">
+        <label class="sr-only" for="chatInput">메시지</label>
+        <textarea
+          id="chatInput"
+          rows="1"
+          placeholder="메시지를 입력하세요 (Enter 전송)"
+          autocomplete="off"
+          required
+        ></textarea>
+        <div class="chat-form-actions">
+          <button type="button" id="syncEmotionBtn" class="btn btn-ghost btn-sm touch-btn">표정 반영</button>
+          <button type="submit" id="chatSendBtn" class="btn btn-primary touch-btn">전송</button>
+        </div>
+      </form>
+    </section>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/camera.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=12"></script>
+{% endblock %}

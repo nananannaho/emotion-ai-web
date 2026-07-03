@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}회원가입{% endblock %}
+
+{% block content %}
+<section class="auth-page">
+  <div class="auth-card glass">
+    <h2>회원가입</h2>
+    <p class="auth-sub">이메일을 입력하고 얼굴을 등록하면 다음부터 얼굴 인식으로 로그인할 수 있어요.</p>
+    <form id="registerForm" class="auth-form">
+      <label>
+        <span>사용자 이름</span>
+        <input type="text" name="username" required minlength="2" placeholder="영문/숫자 2자 이상" autocomplete="username">
+      </label>
+      <label>
+        <span>표시 이름</span>
+        <input type="text" name="display_name" placeholder="챗봇이 부를 이름">
+      </label>
+      <label>
+        <span>이메일</span>
+        <input type="email" name="email" required autocomplete="email" placeholder="비밀번호 재설정에 사용할 이메일">
+      </label>
+      <label>
+        <span>비밀번호</span>
+        <div class="password-input-wrap">
+          <input type="password" id="registerPasswordInput" name="password" required minlength="8" autocomplete="new-password" placeholder="비밀번호 입력">
+          <button type="button" class="password-toggle-btn" aria-label="비밀번호 보기" aria-pressed="false">보기</button>
+        </div>
+        <p class="field-hint">8자 이상 · 특수문자 1개 이상 · <span class="field-hint-muted">*, &amp;, &quot; 사용 불가</span></p>
+      </label>
+
+      <div class="camera-block">
+        <p class="camera-label">얼굴 등록 (정면을 바라봐 주세요)</p>
+        <div class="camera-wrap">
+          <video id="registerVideo" autoplay playsinline muted></video>
+          <canvas id="registerCanvas" hidden></canvas>
+        </div>
+        <button type="button" id="captureFaceBtn" class="btn btn-secondary btn-block">얼굴 촬영</button>
+        <button type="button" id="galleryFaceBtn" class="btn btn-ghost btn-block touch-btn">사진 촬영 / 선택 (모바일)</button>
+        <input type="file" id="galleryFaceInput" accept="image/*" capture="user" hidden>
+        <p id="faceStatus" class="status-text"></p>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block">가입 완료</button>
+    </form>
+    <p class="auth-footer">이미 계정이 있나요? <a href="/login">로그인</a></p>
+    <p id="registerError" class="error-text" hidden></p>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/api.js') }}"></script>
+<script src="{{ url_for('static', filename='js/camera.js') }}"></script>
+<script src="{{ url_for('static', filename='js/auth.js') }}?v=23"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    CameraHelper.init('registerVideo', 'registerCanvas');
+    CameraHelper.bindGalleryButton('galleryFaceBtn', 'galleryFaceInput', 'registerVideo', 'faceStatus');
+    AuthHelper.initRegister();
+  });
+</script>
+{% endblock %}
